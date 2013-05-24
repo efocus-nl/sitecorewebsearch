@@ -1,0 +1,10 @@
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\bin\Debug\Efocus.LuceneWebSearch.dll
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\bin\Debug\Efocus.LuceneWebSearch.pdb
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\bin\Debug\BoC.dll
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\bin\Debug\Lucene.Net.dll
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\bin\Debug\NCrawler.dll
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\bin\Debug\Sitecore.Kernel.dll
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\bin\Debug\Sitecore.Logging.dll
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\obj\Debug\Efocus.LuceneWebSearch.csprojResolveAssemblyReference.cache
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\obj\Debug\Efocus.LuceneWebSearch.dll
+D:\Webroots\LocalUser\ARAG\Sitecore2013\O\Src\Modules\Efocus.LuceneWebSearch\obj\Debug\Efocus.LuceneWebSearch.pdb
