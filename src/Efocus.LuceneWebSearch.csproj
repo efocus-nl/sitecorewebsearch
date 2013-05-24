@@ -31,16 +31,16 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BoC">
-      <HintPath>..\..\..\Libs\BoC\BoC.dll</HintPath>
+      <HintPath>..\Libs\BoC\BoC.dll</HintPath>
     </Reference>
     <Reference Include="Lucene.Net">
-      <HintPath>..\..\..\Libs\Sitecore\Lucene.Net.dll</HintPath>
+      <HintPath>..\Libs\Sitecore\Lucene.Net.dll</HintPath>
     </Reference>
     <Reference Include="NCrawler">
-      <HintPath>..\..\..\Libs\NCrawler\NCrawler.dll</HintPath>
+      <HintPath>..\Libs\NCrawler\NCrawler.dll</HintPath>
     </Reference>
     <Reference Include="Sitecore.Kernel">
-      <HintPath>..\..\..\Libs\Sitecore\Sitecore.Kernel.dll</HintPath>
+      <HintPath>..\Libs\Sitecore\Sitecore.Kernel.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.configuration" />
