@@ -2,7 +2,7 @@
 using Lucene.Net.Search;
 using Sitecore.Search;
 
-namespace Efocus.LuceneWebSearch
+namespace Efocus.Sitecore.LuceneWebSearch
 {
     public class SortableIndexSearchContext : IndexSearchContext, IDisposable
     {

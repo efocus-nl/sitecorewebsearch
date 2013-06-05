@@ -11,12 +11,11 @@ using System.Xml;
 using Autofac;
 using BoC.InversionOfControl;
 using BoC.Logging;
-using Efocus.LuceneWebSearch.SitecoreProcessors;
+using Efocus.Sitecore.LuceneWebSearch.SitecoreProcessors;
 using HtmlAgilityPack;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
 using NCrawler;
-using NCrawler.Extensions;
 using NCrawler.HtmlProcessor;
 using NCrawler.Interfaces;
 using NCrawler.Services;
@@ -30,7 +29,7 @@ using Sitecore.Links;
 using Sitecore.Search;
 using Sitecore.Search.Crawlers;
 
-namespace Efocus.LuceneWebSearch
+namespace Efocus.Sitecore.LuceneWebSearch
 {
     public static class CustomFields
     {

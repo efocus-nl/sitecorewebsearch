@@ -4,7 +4,7 @@ using Sitecore.Data;
 using Sitecore.Data.Items;
 using Sitecore.Search;
 
-namespace Efocus.LuceneWebSearch
+namespace Efocus.Sitecore.LuceneWebSearch
 {
     public class WebSearchResult
     {
@@ -22,7 +22,7 @@ namespace Efocus.LuceneWebSearch
                 var uri = ItemUri.Parse(result.Url);
                 var db = !String.IsNullOrEmpty(uri.DatabaseName)
                              ? Factory.GetDatabase(uri.DatabaseName)
-                             : Sitecore.Context.Database;
+                             : global::Sitecore.Context.Database;
                 if (db != null)
                 {
                     this.Item = db.GetItem(new DataUri(uri));

@@ -8,7 +8,7 @@ using Sitecore.Data.Items;
 using Sitecore.Globalization;
 using Sitecore.Search;
 
-namespace Efocus.LuceneWebSearch
+namespace Efocus.Sitecore.LuceneWebSearch
 {
     public class Searcher
     {
@@ -92,7 +92,7 @@ namespace Efocus.LuceneWebSearch
             if (query != null)
                 boolQuery.Add(query, BooleanClause.Occur.MUST);
 
-            if (rootItem != null && rootItem.ID.ToGuid() != Sitecore.ItemIDs.RootID.ToGuid())
+            if (rootItem != null && rootItem.ID.ToGuid() != global::Sitecore.ItemIDs.RootID.ToGuid())
             {
                 searchContext.Item = rootItem;
             }

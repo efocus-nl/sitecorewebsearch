@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Sitecore.Data;
+﻿using Sitecore.Data;
 using Sitecore.Pipelines.HttpRequest;
 
-namespace Efocus.LuceneWebSearch.SitecoreProcessors
+namespace Efocus.Sitecore.LuceneWebSearch.SitecoreProcessors
 {
     public class AddHeadersHttpRequestProcessor : HttpRequestProcessor
     {
@@ -13,8 +9,8 @@ namespace Efocus.LuceneWebSearch.SitecoreProcessors
 
         public override void Process(HttpRequestArgs args)
         {
-            if (Sitecore.Context.Item != null)
-                args.Context.Response.AddHeader(SitecoreItemHeaderKey, new ItemUri(Sitecore.Context.Item).ToString());
+            if (global::Sitecore.Context.Item != null)
+                args.Context.Response.AddHeader(SitecoreItemHeaderKey, new ItemUri(global::Sitecore.Context.Item).ToString());
         }
     }
 }

@@ -8,30 +8,30 @@ using Sitecore.Search;
 using Sitecore.Shell;
 using Sitecore.Shell.Data;
 
-namespace Efocus.LuceneWebSearch
+namespace Efocus.Sitecore.LuceneWebSearch
 {
     //naming became somewhat awkward, but isearchcontext asks for naming this a searchcontext as well....
     public class FixedSearchContext : ISearchContext
     {
         private bool _ignoreContentEditorOptions;
-        private Sitecore.Data.Items.Item _item;
-        private Sitecore.Security.Accounts.User _user;
+        private global::Sitecore.Data.Items.Item _item;
+        private global::Sitecore.Security.Accounts.User _user;
 
         public FixedSearchContext()
         {
         }
 
-        public FixedSearchContext(Sitecore.Data.Items.Item item)
+        public FixedSearchContext(global::Sitecore.Data.Items.Item item)
         {
             this._item = item;
         }
 
-        public FixedSearchContext(Sitecore.Security.Accounts.User user)
+        public FixedSearchContext(global::Sitecore.Security.Accounts.User user)
         {
             this._user = user;
         }
 
-        public FixedSearchContext(Sitecore.Security.Accounts.User user, Sitecore.Data.Items.Item item)
+        public FixedSearchContext(global::Sitecore.Security.Accounts.User user, global::Sitecore.Data.Items.Item item)
         {
             this._user = user;
             this._item = item;
@@ -40,13 +40,13 @@ namespace Efocus.LuceneWebSearch
         protected virtual void AddDecorations(BooleanQuery result)
         {
             Assert.ArgumentNotNull(result, "result");
-            Sitecore.Security.Accounts.User user = this.User;
+            global::Sitecore.Security.Accounts.User user = this.User;
             if (user != null)
             {
                 result.Add(new TermQuery(new Term(BuiltinFields.Creator, user.Name)), BooleanClause.Occur.SHOULD);
                 result.Add(new TermQuery(new Term(BuiltinFields.Editor, user.Name)), BooleanClause.Occur.SHOULD);
             }
-            Sitecore.Data.Items.Item item = this.Item;
+            global::Sitecore.Data.Items.Item item = this.Item;
             if (item != null)
             {
                 result.Add(new TermQuery(new Term(BuiltinFields.Path, ShortID.Encode(item.ID).ToLowerInvariant())), BooleanClause.Occur.MUST);
@@ -67,7 +67,7 @@ namespace Efocus.LuceneWebSearch
                 }
                 if (!UserOptions.View.ShowEntireTree && (item != null))
                 {
-                    Sitecore.Data.Items.Item item2 = item.Database.GetItem(RootSections.GetSection(item));
+                    global::Sitecore.Data.Items.Item item2 = item.Database.GetItem(RootSections.GetSection(item));
                     if (item2 != null)
                     {
                         result.Add(new TermQuery(new Term(BuiltinFields.Path, ShortID.Encode(item2.ID).ToLowerInvariant())), BooleanClause.Occur.MUST);
@@ -105,7 +105,7 @@ namespace Efocus.LuceneWebSearch
             }
         }
 
-        public Sitecore.Data.Items.Item Item
+        public global::Sitecore.Data.Items.Item Item
         {
             get
             {
@@ -117,7 +117,7 @@ namespace Efocus.LuceneWebSearch
             }
         }
 
-        public Sitecore.Security.Accounts.User User
+        public global::Sitecore.Security.Accounts.User User
         {
             get
             {

@@ -1,12 +1,10 @@
 ﻿using System;
-using Lucene.Net.Index;
 using NCrawler;
 using NCrawler.Interfaces;
 using Sitecore.Data;
-using Sitecore.Reflection;
 using Sitecore.Search;
 
-namespace Efocus.LuceneWebSearch
+namespace Efocus.Sitecore.LuceneWebSearch
 {
     public class UpdateContextAwareCrawler: Crawler
     {

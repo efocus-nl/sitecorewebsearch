@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Efocus.LuceneWebSearch", "Efocus.LuceneWebSearch.csproj", "{2E7D134F-E553-4AC9-8A8F-DE0E73934209}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Efocus.Sitecore.LuceneWebSearch", "Efocus.Sitecore.LuceneWebSearch.csproj", "{2E7D134F-E553-4AC9-8A8F-DE0E73934209}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

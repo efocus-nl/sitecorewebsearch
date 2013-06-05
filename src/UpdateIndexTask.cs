@@ -5,7 +5,7 @@ using Sitecore.Events;
 using Sitecore.Search;
 using Sitecore.Tasks;
 
-namespace Efocus.LuceneWebSearch
+namespace Efocus.Sitecore.LuceneWebSearch
 {
     public class UpdateIndexTask
     {
