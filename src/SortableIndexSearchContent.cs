@@ -18,7 +18,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
         public SearchHits Search(PreparedQuery query, Sort sort)
         {
-            return new SearchHits(Searcher.Search(query.Query, sort));
+            return Search(query.Query, SearchContext.Empty, sort);
         }
 
         public SearchHits Search(QueryBase query, Sort sort)

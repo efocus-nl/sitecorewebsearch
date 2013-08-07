@@ -43,40 +43,40 @@ namespace Efocus.Sitecore.LuceneWebSearch
             global::Sitecore.Security.Accounts.User user = this.User;
             if (user != null)
             {
-                result.Add(new TermQuery(new Term(BuiltinFields.Creator, user.Name)), BooleanClause.Occur.SHOULD);
-                result.Add(new TermQuery(new Term(BuiltinFields.Editor, user.Name)), BooleanClause.Occur.SHOULD);
+                result.Add(new TermQuery(new Term(BuiltinFields.Creator, user.Name)), Occur.SHOULD);
+                result.Add(new TermQuery(new Term(BuiltinFields.Editor, user.Name)), Occur.SHOULD);
             }
             global::Sitecore.Data.Items.Item item = this.Item;
             if (item != null)
             {
-                result.Add(new TermQuery(new Term(BuiltinFields.Path, ShortID.Encode(item.ID).ToLowerInvariant())), BooleanClause.Occur.MUST);
-                result.Add(new TermQuery(new Term(BuiltinFields.Database, item.Database.Name.ToLowerInvariant())), BooleanClause.Occur.MUST);
+                result.Add(new TermQuery(new Term(BuiltinFields.Path, ShortID.Encode(item.ID).ToLowerInvariant())), Occur.MUST);
+                result.Add(new TermQuery(new Term(BuiltinFields.Database, item.Database.Name.ToLowerInvariant())), Occur.MUST);
                 if (this.ContentLanguage == null)
-                    result.Add(new TermQuery(new Term(BuiltinFields.Language, item.Language.ToString().ToLowerInvariant())), BooleanClause.Occur.MUST);
+                    result.Add(new TermQuery(new Term(BuiltinFields.Language, item.Language.ToString().ToLowerInvariant())), Occur.MUST);
             }
             if (this.ContentLanguage != null)
             {
                 TermQuery query = new TermQuery(new Term(BuiltinFields.Language, this.ContentLanguage.ToString().ToLowerInvariant()));
-                result.Add(query, BooleanClause.Occur.MUST);
+                result.Add(query, Occur.MUST);
             }
             if (!this.IgnoreContentEditorOptions)
             {
                 if (!UserOptions.View.ShowHiddenItems)
                 {
-                    result.Add(new TermQuery(new Term(BuiltinFields.Hidden, "1")), BooleanClause.Occur.MUST_NOT);
+                    result.Add(new TermQuery(new Term(BuiltinFields.Hidden, "1")), Occur.MUST_NOT);
                 }
                 if (!UserOptions.View.ShowEntireTree && (item != null))
                 {
                     global::Sitecore.Data.Items.Item item2 = item.Database.GetItem(RootSections.GetSection(item));
                     if (item2 != null)
                     {
-                        result.Add(new TermQuery(new Term(BuiltinFields.Path, ShortID.Encode(item2.ID).ToLowerInvariant())), BooleanClause.Occur.MUST);
+                        result.Add(new TermQuery(new Term(BuiltinFields.Path, ShortID.Encode(item2.ID).ToLowerInvariant())), Occur.MUST);
                     }
                 }
             }
             if (TemplateID != default(Guid))
             {
-                result.Add(new TermQuery(new Term(BuiltinFields.Template, new ShortID(TemplateID).ToString().ToLowerInvariant())), BooleanClause.Occur.MUST);
+                result.Add(new TermQuery(new Term(BuiltinFields.Template, new ShortID(TemplateID).ToString().ToLowerInvariant())), Occur.MUST);
             }
         }
 
@@ -86,9 +86,9 @@ namespace Efocus.Sitecore.LuceneWebSearch
             Assert.ArgumentNotNull(query, "query");
             BooleanQuery result = new BooleanQuery(true);
             if (!(query is MatchAllDocsQuery))
-                result.Add(query, BooleanClause.Occur.MUST);
+                result.Add(query, Occur.MUST);
             this.AddDecorations(result);
-            return result.Clauses().Count > 0 ? result : query;
+            return result.Clauses.Count > 0 ? result : query;
         }
 
         public Language ContentLanguage { get; set; }

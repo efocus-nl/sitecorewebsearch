@@ -139,11 +139,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
             UriSensitivity = UriComponents.UserInfo;
 
             NCrawlerModule.Register(builder =>
-                builder.Register((c, p) =>
                 {
-                    NCrawlerModule.Setup(); // Return to standard setup
-                    return new HashtagIndependentInMemoryCrawlerHistoryService();
-                }).As<ICrawlerHistory>().InstancePerDependency()
+                    builder.Register((c, p) =>
+                        {
+                            NCrawlerModule.Setup(); // Return to standard setup
+                            return new HashtagIndependentInMemoryCrawlerHistoryService();
+                        }).As<ICrawlerHistory>().InstancePerDependency();
+
+                    builder.Register(c => new SitecoreLogger(IoC.Resolver.Resolve<ILogger>()))
+                           .As<ILog>().InstancePerDependency();
+                }
             );
         }
 
@@ -433,7 +438,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             document.Add(this.CreateTextField(BuiltinFields.Tags, this.Tags));
             document.Add(this.CreateDataField(BuiltinFields.Tags, this.Tags));
             document.Add(CreateDataField(BuiltinFields.Group, id));
-            document.SetBoost(this.Boost);
+            document.Boost = this.Boost;
         }
 
         protected virtual void AddVersionIdentifiers(Item item, Document document)
@@ -455,19 +460,19 @@ namespace Efocus.Sitecore.LuceneWebSearch
             Assert.ArgumentNotNull((object)item, "item");
             string displayName = item.Appearance.DisplayName;
             Assert.IsNotNull((object)displayName, "Item's display name is null.");
-            document.Add((Fieldable)this.CreateTextField(BuiltinFields.Name, item.Name));
-            document.Add((Fieldable)this.CreateTextField(BuiltinFields.Name, displayName));
-            document.Add((Fieldable)this.CreateValueField(BuiltinFields.Icon, item.Appearance.Icon));
-            document.Add((Fieldable)this.CreateTextField(BuiltinFields.Creator, item.Statistics.CreatedBy));
-            document.Add((Fieldable)this.CreateTextField(BuiltinFields.Editor, item.Statistics.UpdatedBy));
-            document.Add((Fieldable)this.CreateTextField(BuiltinFields.AllTemplates, this.GetAllTemplates(item)));
-            document.Add((Fieldable)this.CreateTextField(BuiltinFields.TemplateName, item.TemplateName));
+            document.Add(this.CreateTextField(BuiltinFields.Name, item.Name));
+            document.Add(this.CreateTextField(BuiltinFields.Name, displayName));
+            document.Add(this.CreateValueField(BuiltinFields.Icon, item.Appearance.Icon));
+            document.Add(this.CreateTextField(BuiltinFields.Creator, item.Statistics.CreatedBy));
+            document.Add(this.CreateTextField(BuiltinFields.Editor, item.Statistics.UpdatedBy));
+            document.Add(this.CreateTextField(BuiltinFields.AllTemplates, this.GetAllTemplates(item)));
+            document.Add(this.CreateTextField(BuiltinFields.TemplateName, item.TemplateName));
             if (this.IsHidden(item))
-                document.Add((Fieldable)this.CreateValueField(BuiltinFields.Hidden, "1"));
-            document.Add((Fieldable)this.CreateValueField(BuiltinFields.Created, item[FieldIDs.Created]));
-            document.Add((Fieldable)this.CreateValueField(BuiltinFields.Updated, item[FieldIDs.Updated]));
-            document.Add((Fieldable)this.CreateTextField(BuiltinFields.Path, this.GetItemPath(item)));
-            document.Add((Fieldable)this.CreateTextField(BuiltinFields.Links, this.GetItemLinks(item)));
+                document.Add(this.CreateValueField(BuiltinFields.Hidden, "1"));
+            document.Add(this.CreateValueField(BuiltinFields.Created, item[FieldIDs.Created]));
+            document.Add(this.CreateValueField(BuiltinFields.Updated, item[FieldIDs.Updated]));
+            document.Add(this.CreateTextField(BuiltinFields.Path, this.GetItemPath(item)));
+            document.Add(this.CreateTextField(BuiltinFields.Links, this.GetItemLinks(item)));
             if (this.Tags.Length <= 0)
                 return;
         }
