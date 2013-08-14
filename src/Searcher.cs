@@ -13,12 +13,12 @@ namespace Efocus.Sitecore.LuceneWebSearch
     public class Searcher
     {
         private readonly string _indexName;
-        private readonly Language _language;
+        public List<Language> Languages { get; set; }
 
-        public Searcher(string indexName, Language language = null)
+        public Searcher(string indexName, params Language[] languages)
         {
             _indexName = indexName;
-            _language = language;
+            Languages = new List<Language>(languages);
         }
 
         public IEnumerable<WebSearchResult> Query(String query, out int totalResults,
@@ -97,7 +97,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 searchContext.Item = rootItem;
             }
 
-            searchContext.ContentLanguage = _language;
+            searchContext.ContentLanguages = Languages;
 
             using (var context = new SortableIndexSearchContext(SearchManager.GetIndex(_indexName)))
             {

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Lucene.Net.Index;
 using Lucene.Net.Search;
 using Sitecore.Data;
@@ -19,6 +20,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
         public FixedSearchContext()
         {
+            ContentLanguages = new List<Language>();
         }
 
         public FixedSearchContext(global::Sitecore.Data.Items.Item item)
@@ -51,13 +53,14 @@ namespace Efocus.Sitecore.LuceneWebSearch
             {
                 result.Add(new TermQuery(new Term(BuiltinFields.Path, ShortID.Encode(item.ID).ToLowerInvariant())), Occur.MUST);
                 result.Add(new TermQuery(new Term(BuiltinFields.Database, item.Database.Name.ToLowerInvariant())), Occur.MUST);
-                if (this.ContentLanguage == null)
+                if (this.ContentLanguages.Count == 0)
                     result.Add(new TermQuery(new Term(BuiltinFields.Language, item.Language.ToString().ToLowerInvariant())), Occur.MUST);
             }
-            if (this.ContentLanguage != null)
+            if (this.ContentLanguages.Count > 0)
             {
-                TermQuery query = new TermQuery(new Term(BuiltinFields.Language, this.ContentLanguage.ToString().ToLowerInvariant()));
-                result.Add(query, Occur.MUST);
+                var langQuery = new BooleanQuery(true);
+                this.ContentLanguages.ForEach(lang => langQuery.Add(new TermQuery(new Term(BuiltinFields.Language, lang.ToString().ToLowerInvariant())), Occur.SHOULD));
+                result.Add(langQuery, Occur.MUST);
             }
             if (!this.IgnoreContentEditorOptions)
             {
@@ -91,7 +94,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             return result.Clauses.Count > 0 ? result : query;
         }
 
-        public Language ContentLanguage { get; set; }
+        public List<Language> ContentLanguages { get; set; }
 
         public bool IgnoreContentEditorOptions
         {
