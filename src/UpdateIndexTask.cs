@@ -1,4 +1,5 @@
 ﻿using System;
+using Efocus.Sitecore.LuceneWebSearch.Enums;
 using Sitecore.Data.Items;
 using Sitecore.Diagnostics;
 using Sitecore.Events;
@@ -24,13 +25,19 @@ namespace Efocus.Sitecore.LuceneWebSearch
                             var index = SearchManager.GetIndex(indexName);
                             if (index != null)
                             {
-                                if ("update".Equals(item["Action"]))
+                                IndexAction action;
+                                Enum.TryParse(item["Action"], true, out action);
+
+                                switch (action)
                                 {
-                                    Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower(), index);
-                                }
-                                else
-                                {
-                                    index.Rebuild();
+                                    case IndexAction.Update:
+                                        Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower(), index);
+                                        Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower() + ":remote", index);
+                                        break;
+                                    default:
+                                        Event.RaiseEvent("efocus:rebuildindex:" + index.Name.ToLower() + ":remote");
+                                        index.Rebuild();
+                                        break;
                                 }
                             }
                         }

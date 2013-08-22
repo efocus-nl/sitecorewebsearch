@@ -54,6 +54,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Enums\IndexAction.cs" />
     <Compile Include="FixedSearchContext.cs" />
     <Compile Include="Searcher.cs" />
     <Compile Include="SitecoreLogger.cs" />

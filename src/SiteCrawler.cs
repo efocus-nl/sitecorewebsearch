@@ -171,6 +171,14 @@ namespace Efocus.Sitecore.LuceneWebSearch
             }
 
             Event.Subscribe("efocus:updateindex:" + index.Name.ToLower(), (sender, args) => UpdateIndex());
+            Event.Subscribe("efocus:updateindex:" + index.Name.ToLower() + ":remote", (sender, args) => UpdateIndex());
+            Event.Subscribe("efocus:rebuildindex:" + index.Name.ToLower() + ":remote", (sender, args) => RebuildIndex(index.Name.ToLower()));
+        }
+
+        protected virtual void RebuildIndex(string indexName)
+        {
+            var index = SearchManager.GetIndex(indexName);
+            index.Rebuild();
         }
 
         protected virtual void UpdateIndex()
