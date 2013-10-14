@@ -87,7 +87,7 @@ but not me!
 ```
 "but not me!" is not added to the index
 
-FollowFilters: Works quite the same as IndexFilters, only these are applied just before gathering all <a> tags to crawl. So using the above sample, if you have this html:
+FollowFilters: Works quite the same as IndexFilters, only these are applied just before gathering all ```<a>``` tags to crawl. So using the above sample, if you have this html:
 ```
 <b>you can index me</b>
 <a href="follow.aspx">follow me</a>
