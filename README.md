@@ -20,7 +20,6 @@ As so many Sitecore modules, this module also allows you to configure it through
 
 A sample configuration would be App_Config/Includes/efocus.websearch.config
 ```
-<sitecore>
 <configuration xmlns:patch="http://www.sitecore.net/xmlconfig/">
   <sitecore>
     <pipelines>
@@ -88,12 +87,15 @@ but not me!
 ```
 "but not me!" is not added to the index
 
-FollowFilters: Works quite the same as IndexFilters, only these are applied just before gathering all <a> tags to crawl. So using the above sample, if you have this html:<b>you can index me</b>
+FollowFilters: Works quite the same as IndexFilters, only these are applied just before gathering all <a> tags to crawl. So using the above sample, if you have this html:
+```
+<b>you can index me</b>
 <a href="follow.aspx">follow me</a>
 <!-- BEGIN-NOFOLLOW -->
 <a href="follownot.aspx">but not me!</a>
 <!-- END-NOFOLLOW -->
 <a href="follownot" rel="nofollow">me neither</a>
+```
 The links 'but not me' and 'me neither' are not crawled
 Also, if you add a <meta name="robots" content="nofollow" /> to your <head> , not any link on the entire page will be crawled 
 
