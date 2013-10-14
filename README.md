@@ -97,7 +97,7 @@ FollowFilters: Works quite the same as IndexFilters, only these are applied just
 <a href="follownot" rel="nofollow">me neither</a>
 ```
 The links 'but not me' and 'me neither' are not crawled
-Also, if you add a <meta name="robots" content="nofollow" /> to your <head> , not any link on the entire page will be crawled 
+Also, if you add a ```<meta name="robots" content="nofollow" />``` to your ```<head>``` , not any link on the entire page will be crawled 
 
 ##Usage
 For getting results from your indexed content, you can use the Efocus.Sitecore.LuceneWebSearch.Searcher class.
