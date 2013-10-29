@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -28,6 +29,8 @@ using Sitecore.Events;
 using Sitecore.Links;
 using Sitecore.Search;
 using Sitecore.Search.Crawlers;
+using Sitecore.SecurityModel;
+using Module = Autofac.Module;
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
@@ -171,7 +174,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             }
 
             Event.Subscribe("efocus:updateindex:" + index.Name.ToLower(), (sender, args) => UpdateIndex());
-            Event.Subscribe("efocus:updateindex:" + index.Name.ToLower() + ":remote", (sender, args) => UpdateIndex());
+            //Event.Subscribe("efocus:updateindex:" + index.Name.ToLower() + ":remote", (sender, args) => UpdateIndex());
             Event.Subscribe("efocus:rebuildindex:" + index.Name.ToLower() + ":remote", (sender, args) => RebuildIndex(index.Name.ToLower()));
         }
 
@@ -227,6 +230,11 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 foreach (var url in urls)
                 {
                     _logger.InfoFormat("Starting url: {0}", url);
+
+                    //var authorizedCookies = GetAuthorizationCookie(new Uri("http://royalhaskoningdhv.com.localhost.efocus.local/en/nereda/login"));
+                    //var modules = new Module[] { new CustomDownloaderModule(authorizedCookies) };
+                    //NCrawlerModule.Setup(modules);
+
                     using (var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url), new HtmlDocumentProcessor(_indexFilters, _followFilters), this))
                     {
                         _logger.Info("Crawler started: Using 2 threads");
@@ -394,10 +402,14 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     var itemUri = ItemUri.Parse(itemId);
                     if (itemUri != null)
                     {
-                        var db = Factory.GetDatabase(itemUri.DatabaseName);
-                        var item = db.GetItem(new DataUri(itemUri));
-                        AddVersionIdentifiers(item, document);
-                        AddSpecialFields(item, document);
+                        //Using security disabler for secured search
+                        using (new SecurityDisabler())
+                        {
+                            var db = Factory.GetDatabase(itemUri.DatabaseName);
+                            var item = db.GetItem(new DataUri(itemUri));
+                            AddVersionIdentifiers(item, document);
+                            AddSpecialFields(item, document);
+                        }
                     }
                 }
             }
@@ -551,6 +563,42 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 }
                 return _globalVariables;
             }
+        }
+
+        private static CookieContainer GetAuthorizationCookie(Uri loginPage)
+        {
+            CookieContainer cookies;
+
+            //Put all required form post data here.
+            var postData = new NameValueCollection
+                        {
+                            {"Email", "arjen.van.veen@nines.nl"},
+                            {"Password", "Zaterdag123"},
+                        };
+
+            using (var client = new CookiesAwareWebClient())
+            {
+                client.IgnoreRedirects = false;
+                //Load Page via get request to initialize cookies...
+                client.DownloadData(loginPage);
+                //Add cookies to the outbound request.
+                client.OutboundCookies.Add(client.InboundCookies);
+                client.UploadValues(loginPage, "POST", postData);
+                //Add latest cookies (includes the authorization to the cookie collection)
+                client.OutboundCookies.Add(client.InboundCookies);
+                cookies = client.OutboundCookies;
+            }
+
+            if (cookies == null || cookies.Count == 0)
+            {
+                //Console.Writeline("Authorization Cookies are null or empty.");
+            }
+            else
+            {
+                //Console.Writeline("Authorization Cookies obtained.");
+            }
+
+            return cookies;
         }
         #endregion
     }

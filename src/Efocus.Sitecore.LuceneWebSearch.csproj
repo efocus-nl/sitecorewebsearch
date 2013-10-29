@@ -54,6 +54,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CookiesAwareWebClient.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="CustomDownloaderModule.cs" />
+    <Compile Include="CustomWebDownloader.cs" />
     <Compile Include="Enums\IndexAction.cs" />
     <Compile Include="FixedSearchContext.cs" />
     <Compile Include="Searcher.cs" />

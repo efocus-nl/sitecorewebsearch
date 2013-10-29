@@ -32,11 +32,11 @@ namespace Efocus.Sitecore.LuceneWebSearch
                                 {
                                     case IndexAction.Update:
                                         Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower(), index);
-                                        Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower() + ":remote", index);
+                                        //Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower() + ":remote", index);
                                         break;
                                     default:
                                         Event.RaiseEvent("efocus:rebuildindex:" + index.Name.ToLower() + ":remote");
-                                        index.Rebuild();
+                                        //index.Rebuild();
                                         break;
                                 }
                             }
