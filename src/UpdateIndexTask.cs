@@ -28,15 +28,15 @@ namespace Efocus.Sitecore.LuceneWebSearch
                                 IndexAction action;
                                 Enum.TryParse(item["Action"], true, out action);
 
+                                var args = new CustomEventArgs {Item = item};
+
                                 switch (action)
                                 {
                                     case IndexAction.Update:
-                                        Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower(), index);
-                                        //Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower() + ":remote", index);
+                                        Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower(), args);
                                         break;
                                     default:
-                                        Event.RaiseEvent("efocus:rebuildindex:" + index.Name.ToLower() + ":remote");
-                                        //index.Rebuild();
+                                        Event.RaiseEvent("efocus:rebuildindex:" + index.Name.ToLower() + ":remote", args);
                                         break;
                                 }
                             }
@@ -50,5 +50,10 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 }
             }
         }
+    }
+
+    public class CustomEventArgs : EventArgs
+    {
+        public Item Item { get; set; }
     }
 }

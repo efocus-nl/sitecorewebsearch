@@ -30,6 +30,9 @@ using Sitecore.Links;
 using Sitecore.Search;
 using Sitecore.Search.Crawlers;
 using Sitecore.SecurityModel;
+using Sitecore.Events;
+using Sitecore.Sites;
+using Sitecore.Web;
 using Module = Autofac.Module;
 
 namespace Efocus.Sitecore.LuceneWebSearch
@@ -66,7 +69,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
         private ILogger _logger;
         private Index _index;
         private readonly StringCollection _urls = new StringCollection();
-        private readonly StringCollection _triggers = new StringCollection();
         private readonly Dictionary<string, string> _indexFilters = new Dictionary<string, string>();
         private readonly Dictionary<string, string> _followFilters = new Dictionary<string, string>();
         private readonly Object _runninglock = new Object();
@@ -75,6 +77,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
         private bool _isrunning = false;
         private bool _updateIndexRunning = false;
         private object _updateIndexRunningLock = new object();
+        private Item _indexTaskConfiguration;
 
 #region configurable settings
         public bool AdhereToRobotRules { get; set; }
@@ -127,10 +130,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
         {
             get { return _urls; }
         }
-        public IList Triggers
-        {
-            get { return _triggers; }
-        }
 #endregion
         
         public SiteCrawler()
@@ -162,30 +161,53 @@ namespace Efocus.Sitecore.LuceneWebSearch
             _index = index;
             _logger.Info("Crawler initialized");
 
-            if (_triggers.Count == 0)
-            {
-                _triggers.Add("publish:end");
-                _triggers.Add("publish:end:remote");
-            }
-
-            foreach (var trigger in _triggers)
-            {
-                Event.Subscribe(trigger, (sender, args) => new Thread(UpdateIndex).Start());
-            }
-
-            Event.Subscribe("efocus:updateindex:" + index.Name.ToLower(), (sender, args) => UpdateIndex());
+            var updateHandler = new EventHandler(UpdateIndex);
+            Event.Subscribe("efocus:updateindex:" + index.Name.ToLower(), updateHandler);
             //Event.Subscribe("efocus:updateindex:" + index.Name.ToLower() + ":remote", (sender, args) => UpdateIndex());
-            Event.Subscribe("efocus:rebuildindex:" + index.Name.ToLower() + ":remote", (sender, args) => RebuildIndex(index.Name.ToLower()));
+            var rebuildHandler = new EventHandler(RebuildIndex);
+            Event.Subscribe("efocus:rebuildindex:" + index.Name.ToLower() + ":remote", rebuildHandler);
         }
 
-        protected virtual void RebuildIndex(string indexName)
+        protected virtual void RebuildIndex(object sender, EventArgs args)
         {
-            var index = SearchManager.GetIndex(indexName);
+            var customArgs = Event.ExtractParameter(args, 0) as CustomEventArgs;
+
+            if (customArgs != null && customArgs.Item != null)
+                _indexTaskConfiguration = customArgs.Item;
+            else
+            {
+                _logger.InfoFormat("IndexTaskConfiguration item could not be found, aborting");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(_indexTaskConfiguration["Index"]))
+            {
+                _logger.InfoFormat("Index is not defined, aborting");
+                return;
+            }
+
+            var index = SearchManager.GetIndex(_indexTaskConfiguration["Index"]);
             index.Rebuild();
         }
 
-        protected virtual void UpdateIndex()
+        protected virtual void UpdateIndex(object sender, EventArgs args)
         {
+            var customArgs = Event.ExtractParameter(args, 0) as CustomEventArgs;
+
+            if (customArgs != null && customArgs.Item != null)
+                _indexTaskConfiguration = customArgs.Item;
+            else
+            {
+                _logger.InfoFormat("IndexTaskConfiguration item could not be found, aborting");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(_indexTaskConfiguration["Index"]))
+            {
+                _logger.InfoFormat("Index is not defined, aborting");
+                return;
+            }
+
             if (_updateIndexRunning)
                 return;
             lock (_updateIndexRunningLock)
@@ -230,10 +252,43 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 foreach (var url in urls)
                 {
                     _logger.InfoFormat("Starting url: {0}", url);
+                    ID loginPageId;
 
-                    //var authorizedCookies = GetAuthorizationCookie(new Uri("http://royalhaskoningdhv.com.localhost.efocus.local/en/nereda/login"));
-                    //var modules = new Module[] { new CustomDownloaderModule(authorizedCookies) };
-                    //NCrawlerModule.Setup(modules);
+                    //Let the crawler login first, if the required values are available
+                    if (!string.IsNullOrEmpty(_indexTaskConfiguration["UserFieldName"]) && !string.IsNullOrEmpty(_indexTaskConfiguration["User"]) &&
+                        !string.IsNullOrEmpty(_indexTaskConfiguration["PassFieldName"]) && !string.IsNullOrEmpty(_indexTaskConfiguration["Pass"]) &&
+                        !string.IsNullOrEmpty(_indexTaskConfiguration["LoginPage"]) && ID.TryParse(_indexTaskConfiguration["LoginPage"], out loginPageId) &&
+                        _indexTaskConfiguration.Database.GetItem(loginPageId) != null)
+                    {
+                        var postData = new NameValueCollection
+                        {
+                            {_indexTaskConfiguration["UserFieldName"], _indexTaskConfiguration["User"]},
+                            {_indexTaskConfiguration["PassFieldName"], _indexTaskConfiguration["Pass"]},
+                        };
+
+                        Item loginPage = _indexTaskConfiguration.Database.GetItem(loginPageId);
+                        SiteInfo loginSiteInfo = null;
+                        if (Factory.GetSiteInfoList().Any(x => loginPage.Paths.FullPath.StartsWith(x.RootPath)))
+                            loginSiteInfo = Factory.GetSiteInfoList().OrderByDescending(x => x.RootPath.Count(f => f == '/')).First(x => loginPage.Paths.FullPath.StartsWith(x.RootPath));
+
+                        SiteContext loginSiteContex = null;
+                        if (loginSiteInfo != null)
+                            loginSiteContex = Factory.GetSite(loginSiteInfo.Name);
+
+                        CookieContainer authorizedCookies = null;
+                        if(loginSiteContex != null)
+                            authorizedCookies = GetAuthorizationCookie(new Uri(LinkManager.GetItemUrl(loginPage, new UrlOptions() { Site = loginSiteContex })), postData);
+                        else
+                            authorizedCookies = GetAuthorizationCookie(new Uri(LinkManager.GetItemUrl(loginPage)), postData);
+
+                        var modules = new Module[] { new CustomDownloaderModule(authorizedCookies) };
+                        NCrawlerModule.Setup(modules);
+                        _logger.InfoFormat(authorizedCookies.Count > 2
+                            ? "Crawler is logged in, performing a secured search"
+                            : "Crawler could not login, going to crawl without");
+                    }
+                    else
+                        _logger.InfoFormat("Required values for the crawler to login are not met, going to crawl without");
 
                     using (var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url), new HtmlDocumentProcessor(_indexFilters, _followFilters), this))
                     {
@@ -565,16 +620,9 @@ namespace Efocus.Sitecore.LuceneWebSearch
             }
         }
 
-        private static CookieContainer GetAuthorizationCookie(Uri loginPage)
+        private static CookieContainer GetAuthorizationCookie(Uri loginPage, NameValueCollection postData)
         {
             CookieContainer cookies;
-
-            //Put all required form post data here.
-            var postData = new NameValueCollection
-                        {
-                            {"Email", "arjen.van.veen@nines.nl"},
-                            {"Password", "Zaterdag123"},
-                        };
 
             using (var client = new CookiesAwareWebClient())
             {
@@ -587,15 +635,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 //Add latest cookies (includes the authorization to the cookie collection)
                 client.OutboundCookies.Add(client.InboundCookies);
                 cookies = client.OutboundCookies;
-            }
-
-            if (cookies == null || cookies.Count == 0)
-            {
-                //Console.Writeline("Authorization Cookies are null or empty.");
-            }
-            else
-            {
-                //Console.Writeline("Authorization Cookies obtained.");
             }
 
             return cookies;
