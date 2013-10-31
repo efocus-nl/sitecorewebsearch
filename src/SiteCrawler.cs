@@ -69,6 +69,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
         private ILogger _logger;
         private Index _index;
         private readonly StringCollection _urls = new StringCollection();
+        private readonly StringCollection _triggers = new StringCollection();
         private readonly Dictionary<string, string> _indexFilters = new Dictionary<string, string>();
         private readonly Dictionary<string, string> _followFilters = new Dictionary<string, string>();
         private readonly Object _runninglock = new Object();
@@ -129,6 +130,11 @@ namespace Efocus.Sitecore.LuceneWebSearch
         public IList Urls
         {
             get { return _urls; }
+        }
+
+        public IList Triggers
+        {
+            get { return _triggers; }
         }
 #endregion
         
