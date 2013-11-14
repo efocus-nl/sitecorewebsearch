@@ -145,13 +145,13 @@ namespace Efocus.Sitecore.LuceneWebSearch
             MaximumThreadCount = 2;
             RegexExcludeFilter = @"(\.jpg|\.css|\.js|\.gif|\.jpeg|\.png|\.ico)";
             UriSensitivity = UriComponents.UserInfo;
-
+            _historyService = new HashtagIndependentInMemoryCrawlerHistoryService();
             NCrawlerModule.Register(builder =>
                 {
                     builder.Register((c, p) =>
                         {
                             NCrawlerModule.Setup(); // Return to standard setup
-                            return new HashtagIndependentInMemoryCrawlerHistoryService();
+                            return _historyService;
                         }).As<ICrawlerHistory>().InstancePerDependency();
 
                     builder.Register(c => new SitecoreLogger(IoC.Resolver.Resolve<ILogger>()))
@@ -604,6 +604,8 @@ namespace Efocus.Sitecore.LuceneWebSearch
         
         #region Helpers
         readonly System.Reflection.FieldInfo _writerField = typeof(IndexUpdateContext).GetField("_writer", BindingFlags.Instance | BindingFlags.GetField | BindingFlags.NonPublic);
+        private HashtagIndependentInMemoryCrawlerHistoryService _historyService;
+
         public IndexWriter GetIndexWriter(IndexUpdateContext updateContext)
         {
             //sigh
