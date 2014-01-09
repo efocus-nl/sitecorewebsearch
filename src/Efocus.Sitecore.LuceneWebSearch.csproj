@@ -78,10 +78,18 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SiteCrawler.cs" />
     <Compile Include="SortableIndexSearchContent.cs" />
-    <Compile Include="Tasks\DatabaseAgent.cs" />
     <Compile Include="UpdateIndexTask.cs" />
     <Compile Include="UpdateContextAwareCrawler.cs" />
     <Compile Include="WebSearchResult.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Efocus.MailTemplates\src\Efocus.Mailtemplates.csproj">
+      <Project>{f2e9e3ef-6912-4779-8fb5-cc3f747390f7}</Project>
+      <Name>Efocus.Mailtemplates</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Tasks\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
