@@ -250,7 +250,8 @@ namespace Efocus.Sitecore.LuceneWebSearch
             try
             {
                 //now, we're going to delete everything not added in this crawl (deleting it during an update instead of resetting/rebuilding the index keeps the index alive for searching while indexing)
-                GetIndexWriter(context).DeleteAll();
+                //GetIndexWriter(context).DeleteAll();
+                GetIndexWriter(context).DeleteDocuments(new Term(BuiltinFields.Tags, Tags ?? ""));
 
                 var runningContextId = ShortID.NewId();
                 var urls = GetTransformedUrls();
