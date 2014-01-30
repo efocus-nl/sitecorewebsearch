@@ -84,6 +84,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
         public bool AdhereToRobotRules { get; set; }
         public bool UseCookies { get; set; }
         public int MaximumThreadCount { get; set; }
+        public int BoostTitle { get; set; }
         public string RegexExcludeFilter { get; set; }
         public string EventTrigger { get; set; }
         public UriComponents UriSensitivity { get; set; }
