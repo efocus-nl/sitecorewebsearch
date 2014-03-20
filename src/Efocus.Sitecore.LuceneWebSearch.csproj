@@ -51,8 +51,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>$(ModulesLibraryDir)\Sitecore\Lucene.Net.dll</HintPath>
     </Reference>
-    <Reference Include="NCrawler">
-      <HintPath>$(ModulesLibraryDir)\NCrawler\NCrawler.dll</HintPath>
+    <Reference Include="NCrawler, Version=3.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Libs\NCrawler\NCrawler.dll</HintPath>
     </Reference>
     <Reference Include="Sitecore.Kernel, Version=6.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -72,12 +73,22 @@
     <Compile Include="CustomWebDownloader.cs" />
     <Compile Include="Enums\IndexAction.cs" />
     <Compile Include="FixedSearchContext.cs" />
+    <Compile Include="HtmlDocumentProcessor.cs" />
+    <Compile Include="LogHtmlDocumentProcessor.cs" />
     <Compile Include="Searcher.cs" />
+    <Compile Include="SiteCoreItemNotfoundException.cs" />
     <Compile Include="SitecoreLogger.cs" />
     <Compile Include="SitecoreProcessors\AddHeadersHttpRequestProcessor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SiteCrawler.cs" />
     <Compile Include="SortableIndexSearchContent.cs" />
+    <Compile Include="Support\LogLoggerBridge.cs" />
+    <Compile Include="Support\CrawlStartedEventArgs.cs" />
+    <Compile Include="Support\CrawlFinishedPipelineArgs.cs" />
+    <Compile Include="Support\CrawlerEventArgs.cs" />
+    <Compile Include="Support\CrawlDocumentUpdatedEventArgs.cs" />
+    <Compile Include="Support\CrawlDocumentErrorEventArgs.cs" />
+    <Compile Include="Support\CrawlDocumentAnalyseEventArgs.cs" />
     <Compile Include="UpdateIndexTask.cs" />
     <Compile Include="UpdateContextAwareCrawler.cs" />
     <Compile Include="WebSearchResult.cs" />

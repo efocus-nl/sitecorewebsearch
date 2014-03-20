@@ -11,8 +11,10 @@ namespace Efocus.Sitecore.LuceneWebSearch
         public ShortID RunningContextId { get; set; }
         private readonly IndexUpdateContext _updateContext;
 
-        public UpdateContextAwareCrawler(IndexUpdateContext updateContext, ShortID runningContextId, Uri crawlStart, params IPipelineStep[] pipeline): base(crawlStart, pipeline)
+        public UpdateContextAwareCrawler(IndexUpdateContext updateContext, ShortID runningContextId, Uri crawlStart, ILog logger, params IPipelineStep[] pipeline)
+            : base(crawlStart, pipeline)
         {
+            m_Logger = logger;
             RunningContextId = runningContextId;
             _updateContext = updateContext;
         }

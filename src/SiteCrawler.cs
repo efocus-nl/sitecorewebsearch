@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Reflection;
@@ -13,10 +14,14 @@ using Autofac;
 using BoC.InversionOfControl;
 using BoC.Logging;
 using Efocus.Sitecore.LuceneWebSearch.SitecoreProcessors;
+using Efocus.Sitecore.LuceneWebSearch.Support;
 using HtmlAgilityPack;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
+using Lucene.Net.QueryParsers;
+using Lucene.Net.Search;
 using NCrawler;
+using NCrawler.Events;
 using NCrawler.HtmlProcessor;
 using NCrawler.Interfaces;
 using NCrawler.Services;
@@ -34,6 +39,7 @@ using Sitecore.Events;
 using Sitecore.Sites;
 using Sitecore.Web;
 using Module = Autofac.Module;
+using CrawlFinishedEventArgs = Efocus.Sitecore.LuceneWebSearch.Support.CrawlFinishedEventArgs;
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
@@ -48,17 +54,27 @@ namespace Efocus.Sitecore.LuceneWebSearch
     {
         protected override void Add(string key)
         {
-            key = (key ?? "").TrimEnd('#');
+            key = RemoveHash(key);
             base.Add(key);
         }
+
+        private string RemoveHash(string key)
+        {
+            if (!String.IsNullOrEmpty(key) && key.Contains("#"))
+            {
+                return key.Substring(0, key.IndexOf('#'));
+            }
+            return key;
+        }
+
         protected override bool Exists(string key)
         {
-            key = (key ?? "").TrimEnd('#');
+            key = RemoveHash(key);
             return base.Exists(key);
         }
         public override bool Register(string key)
         {
-            key = (key ?? "").TrimEnd('#');
+            key = RemoveHash(key);
             return base.Register(key);
         }
     }
@@ -70,8 +86,9 @@ namespace Efocus.Sitecore.LuceneWebSearch
         private Index _index;
         private readonly StringCollection _urls = new StringCollection();
         private readonly StringCollection _triggers = new StringCollection();
-        private readonly Dictionary<string, string> _indexFilters = new Dictionary<string, string>();
-        private readonly Dictionary<string, string> _followFilters = new Dictionary<string, string>();
+        private readonly StringCollection _rebuildTriggers = new StringCollection();
+        private readonly Dictionary<IEnumerable<char>, IEnumerable<char>> _indexFilters = new Dictionary<IEnumerable<char>, IEnumerable<char>>();
+        private readonly Dictionary<IEnumerable<char>, IEnumerable<char>> _followFilters = new Dictionary<IEnumerable<char>, IEnumerable<char>>();
         private readonly Object _runninglock = new Object();
         private Dictionary<string, string> _globalVariables;
 
@@ -84,6 +101,9 @@ namespace Efocus.Sitecore.LuceneWebSearch
         public bool AdhereToRobotRules { get; set; }
         public bool UseCookies { get; set; }
         public int MaximumThreadCount { get; set; }
+        public int MaximumCrawlDepth { get; set; }
+        public int MaximumDocuments { get; set; }
+        public TimeSpan MaximumCrawlTime { get; set; }
         public int BoostTitle { get; set; }
         public string RegexExcludeFilter { get; set; }
         public string EventTrigger { get; set; }
@@ -93,7 +113,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
         /// This can be custom tags like <!--BeginTextFilter--> and <!--EndTextFilter-->
         /// or whatever you prefer. This way you can control what text is extracted on every page
         /// Most cases you want just to filter the header information or menu text
-        public IDictionary<string, string> IndexFilters
+        public IDictionary<IEnumerable<char>, IEnumerable<char>> IndexFilters
         {
             get { return _indexFilters; }
         }
@@ -102,9 +122,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
             if (node != null && node.Attributes != null)
             {
                 var key = node.Attributes["start"];
+                var keyRegex = node.Attributes["startregex"];
                 var end = node.Attributes["end"];
-                if (key != null && end != null)
-                    IndexFilters.Add(key.Value, end.Value);
+                var endRegex = node.Attributes["endregex"];
+                if ((key != null || keyRegex != null) && (end != null || endRegex != null))
+                {
+                    IndexFilters.Add(
+                        key != null ? (IEnumerable<char>)key.Value : new RegexString(keyRegex.Value),
+                        end != null ? (IEnumerable<char>)end.Value : new RegexString(endRegex.Value)
+                        );
+                }
             }
         }
 
@@ -112,7 +139,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
         /// that start with [key] and ends with [value]. This can be custom tags like
         /// <!--BeginNoFollow--> and <!--EndNoFollow--> or whatever you prefer.
         /// This was you can control what links the crawler should not follow
-        public IDictionary<string, string> FollowFilters
+        public IDictionary<IEnumerable<char>, IEnumerable<char>> FollowFilters
         {
             get { return _followFilters; }
         }
@@ -122,9 +149,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
             if (node != null && node.Attributes != null)
             {
                 var key = node.Attributes["start"];
+                var keyRegex = node.Attributes["startregex"];
                 var end = node.Attributes["end"];
-                if (key != null && end != null)
-                    FollowFilters.Add(key.Value, end.Value);
+                var endRegex = node.Attributes["endregex"];
+                if ((key != null || keyRegex != null) && (end != null || endRegex != null))
+                {
+                    FollowFilters.Add(
+                        key != null ? (IEnumerable<char>)key.Value : new RegexString(keyRegex.Value),
+                        end != null ? (IEnumerable<char>)end.Value : new RegexString(endRegex.Value)
+                        );
+                }
             }
         }
 
@@ -136,6 +170,11 @@ namespace Efocus.Sitecore.LuceneWebSearch
         public IList Triggers
         {
             get { return _triggers; }
+        }
+
+        public IList RebuildTriggers
+        {
+            get { return _rebuildTriggers; }
         }
 #endregion
         
@@ -155,65 +194,109 @@ namespace Efocus.Sitecore.LuceneWebSearch
                             return _historyService;
                         }).As<ICrawlerHistory>().InstancePerDependency();
 
-                    builder.Register(c => new SitecoreLogger(IoC.Resolver.Resolve<ILogger>()))
-                           .As<ILog>().InstancePerDependency();
+                    builder.Register(c => CreateLoggerBridge()).As<ILog>().InstancePerDependency();
                 }
             );
         }
 
         public void Initialize(Index index)
         {
-            //_urlProvider = IoC.Resolver.Resolve<IUrlProvider>();
-            _logger = IoC.Resolver.Resolve<ILogger>();
+            _logger = CreateLogger();
             _index = index;
             _logger.Info("Crawler initialized");
 
-            var updateHandler = new EventHandler(UpdateIndex);
-            Event.Subscribe("efocus:updateindex:" + index.Name.ToLower(), updateHandler);
-            var rebuildHandler = new EventHandler(RebuildIndex);
-            Event.Subscribe("efocus:rebuildindex:" + index.Name.ToLower(), rebuildHandler);
+            if (_triggers.Count == 0) InitializeDefaultTriggers(index);
+            if (_rebuildTriggers.Count == 0) InitializeDefaultRebuildTriggers(index);
+
+            foreach (var trigger in _triggers)
+            {
+                Event.Subscribe(trigger, HandleUpdateIndexEvent);
+            }
+            foreach (var trigger in _rebuildTriggers)
+            {
+                Event.Subscribe(trigger, HandleRebuildIndexEvent);
+            }
         }
 
-        protected virtual void RebuildIndex(object sender, EventArgs args)
+        private void HandleRebuildIndexEvent(object sender, EventArgs eventArgs)
         {
-            var customArgs = Event.ExtractParameter(args, 0) as CustomEventArgs;
+            RebuildIndex();
+        }
 
-            if (customArgs != null && customArgs.Item != null)
-                _indexTaskConfiguration = customArgs.Item;
-            else
+        private void HandleUpdateIndexEvent(object sender, EventArgs eventArgs)
+        {
+            UpdateIndex();
+        }
+
+        private ILog CreateLoggerBridge()
+        {
+            return new LogLoggerBridge(_logger ?? CreateLogger());
+        }
+
+        protected virtual ILogger CreateLogger()
+        {
+            ILogger logger = IoC.Resolver != null ? IoC.Resolver.Resolve<ILogger>() : null;
+            if (logger == null)
             {
-                _logger.InfoFormat("IndexTaskConfiguration item could not be found, aborting");
-                return;
+                logger = new SiteCoreLogger();
             }
 
-            if (string.IsNullOrEmpty(_indexTaskConfiguration["Index"]))
-            {
-                _logger.InfoFormat("Index is not defined, aborting");
-                return;
-            }
+            return logger;
+        }
 
-            var index = SearchManager.GetIndex(_indexTaskConfiguration["Index"]);
+        private void InitializeDefaultRebuildTriggers(Index index)
+        {
+            _triggers.Add(String.Format("efocus:rebuildindex:{0}", index.Name.ToLower()));
+        }
+
+        private void InitializeDefaultTriggers(Index index)
+        {
+            _triggers.Add("publish:end");
+            _triggers.Add(String.Format("efocus:updateindex:{0}", index.Name.ToLower()));
+        }
+
+
+        protected virtual void RebuildIndex(string indexName)
+        {
+            RebuildIndex(SearchManager.GetIndex(indexName));
+        }
+
+        protected virtual void RebuildIndex()
+        {
+            RebuildIndex(_index);
+        }
+
+        private void RebuildIndex(Index index)
+        {
+            if (index == null) return;
+
             index.Rebuild();
         }
 
-        protected virtual void UpdateIndex(object sender, EventArgs args)
+        //protected virtual void RebuildIndex(object sender, EventArgs args)
+        //{
+        //    var customArgs = Event.ExtractParameter(args, 0) as CustomEventArgs;
+
+        //    if (customArgs != null && customArgs.Item != null)
+        //        _indexTaskConfiguration = customArgs.Item;
+        //    else
+        //    {
+        //        _logger.InfoFormat("IndexTaskConfiguration item could not be found, aborting");
+        //        return;
+        //    }
+
+        //    if (string.IsNullOrEmpty(_indexTaskConfiguration["Index"]))
+        //    {
+        //        _logger.InfoFormat("Index is not defined, aborting");
+        //        return;
+        //    }
+
+        //    var index = SearchManager.GetIndex(_indexTaskConfiguration["Index"]);
+        //    index.Rebuild();
+        //}
+
+        protected virtual void UpdateIndex()
         {
-            var customArgs = Event.ExtractParameter(args, 0) as CustomEventArgs;
-
-            if (customArgs != null && customArgs.Item != null)
-                _indexTaskConfiguration = customArgs.Item;
-            else
-            {
-                _logger.InfoFormat("IndexTaskConfiguration item could not be found, aborting");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(_indexTaskConfiguration["Index"]))
-            {
-                _logger.InfoFormat("Index is not defined, aborting");
-                return;
-            }
-
             if (_updateIndexRunning)
                 return;
             lock (_updateIndexRunningLock)
@@ -223,12 +306,24 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 _updateIndexRunning = true;
                 try
                 {
-                    using (var updateContext = this._index.CreateUpdateContext())
+                    using (var updateContext = _index.CreateUpdateContext())
                     {
                         Crawl(updateContext);
+
+						_logger.Info(string.Format("Search index {0} crawling done", _index.Name));
+
                         updateContext.Optimize();
+
+						_logger.Info(string.Format("Search index {0} optimized", _index.Name));
+
                         updateContext.Commit();
+
+						_logger.Info(string.Format("Search index {0} committed", _index.Name));
                     }
+                }
+                catch (Exception crawlExeption)
+                {
+                    _logger.Error(GetExceptionLog(crawlExeption).ToString());
                 }
                 finally
                 {
@@ -250,15 +345,14 @@ namespace Efocus.Sitecore.LuceneWebSearch
             }
             try
             {
-                //now, we're going to delete everything not added in this crawl (deleting it during an update instead of resetting/rebuilding the index keeps the index alive for searching while indexing)
-                //GetIndexWriter(context).DeleteAll();
-                GetIndexWriter(context).DeleteDocuments(new Term(BuiltinFields.Tags, Tags ?? ""));
+                GetIndexWriter(context).DeleteDocuments(new Term(BuiltinFields.Tags, ValueOrEmpty(Tags)));
 
                 var runningContextId = ShortID.NewId();
                 var urls = GetTransformedUrls();
                 foreach (var url in urls)
                 {
-                    _logger.InfoFormat("Starting url: {0}", url);
+                    if (_logger != null) _logger.InfoFormat("Starting url: {0}", url);
+                    var documentProcessor = (_logger != null && _logger.IsDebugEnabled) ? new LogHtmlDocumentProcessor(_logger, _indexFilters, _followFilters) : new HtmlDocumentProcessor(_indexFilters, _followFilters);
                     ID loginPageId;
 
                     //Let the crawler login first, if the required values are available
@@ -290,38 +384,118 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
                         var modules = new Module[] { new CustomDownloaderModule(authorizedCookies) };
                         NCrawlerModule.Setup(modules);
-                        _logger.InfoFormat(authorizedCookies.Count > 2
+                        if (_logger != null) _logger.InfoFormat(authorizedCookies.Count > 2
                             ? "Crawler is logged in, performing a secured search"
                             : "Crawler could not login, going to crawl without");
                     }
                     else
-                        _logger.InfoFormat("Required values for the crawler to login are not met, going to crawl without");
+                        if (_logger != null) _logger.InfoFormat("Required values for the crawler to login are not met, going to crawl without");
 
-                    using (var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url), new HtmlDocumentProcessor(_indexFilters, _followFilters), this))
+                    using (var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url), new LogLoggerBridge(_logger), documentProcessor, this))
                     {
-                        _logger.Info("Crawler started: Using 2 threads");
+                        if (_logger != null) _logger.Info(String.Format("Crawler started: Using {0} threads", MaximumThreadCount));
                         c.AdhereToRobotRules = AdhereToRobotRules;
                         c.MaximumThreadCount = MaximumThreadCount;
                         c.UriSensitivity = UriSensitivity;
+
+                        if (MaximumCrawlDepth > 0)
+                            c.MaximumCrawlDepth = MaximumCrawlDepth;
+
+                        if (MaximumDocuments > 0)
+                            c.MaximumCrawlCount = MaximumDocuments;
+
+                        if (MaximumCrawlTime.TotalMinutes > 0)
+                            c.MaximumCrawlTime = MaximumCrawlTime;
+
                         c.UseCookies = UseCookies;
                         c.ExcludeFilter = new[]
                         {
                             new RegexFilter(new Regex(RegexExcludeFilter))
                         };
 
+                        c.AfterDownload += CrawlerAfterDownload;
+                        c.PipelineException += CrawlerPipelineException;
+                        c.DownloadException += CrawlerDownloadException;
+
+                        Event.RaiseEvent("SiteCrawler:Started", new CrawlStartedEventArgs(c));
+
                         c.Crawl();
+
+                        Event.RaiseEvent("SiteCrawler:Finished", new CrawlFinishedEventArgs(c));
                     }
                 }
             }
+            catch (Exception crawlException)
+            {
+                if (_logger != null) _logger.Error(GetExceptionLog(crawlException).ToString());
+            }
             finally
             {
-                _logger.Info("Crawler finished");
+                if (_logger != null) _logger.Info("Crawler finished");
                 lock (_runninglock)
                 {
                     _isrunning = false;
-
                 }
             }
+        }
+
+        private void CrawlerAfterDownload(object sender, AfterDownloadEventArgs e)
+        {
+            Uri uriToCrawl = null;
+            String responseTime = "unknown";
+            if (e.Response != null)
+            {
+                uriToCrawl = e.Response.ResponseUri;
+                responseTime = e.Response.DownloadTime.TotalSeconds.ToString();
+            }
+            if (uriToCrawl == null)
+            {
+                uriToCrawl = e.CrawlStep.Uri;
+            }
+
+            if (_logger != null) _logger.InfoFormat("{0} in {1}", uriToCrawl, responseTime);
+        }
+
+        private void CrawlerDownloadException(object sender, DownloadExceptionEventArgs e)
+        {
+            if (e.Exception is WebException)
+            {
+                WebException webException = (WebException)e.Exception;
+                _logger.InfoFormat("Error downloading '{0}': {1}; {2} - Continueing crawl", e.CrawlStep.Uri, webException.Status, webException.Source);
+            }
+            else
+            {
+                _logger.InfoFormat("Error downloading '{0}': {1} - Continueing crawl", e.CrawlStep.Uri, e.Exception.Message);
+            }
+        }
+
+        private void CrawlerPipelineException(object sender, PipelineExceptionEventArgs e)
+        {
+            Uri currentUri = ExtractCurrentUri(e.PropertyBag);
+            _logger.InfoFormat("Error processsing '{0}': {1}", currentUri, e.Exception.Message);
+        }
+
+        private static StringBuilder GetExceptionLog(Exception exception)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine(exception.Message);
+            sb.AppendLine("Stacktrace");
+            sb.AppendLine(exception.StackTrace);
+            Action<Exception, int> traceException = null;
+            traceException = (e, depth) =>
+            {
+                if (e == null) return;
+                for (int i = 0; i < depth; i++) sb.Append("\t");
+
+                sb.AppendLine(e.Message);
+                if (e.InnerException != null)
+                {
+                    traceException(e.InnerException, depth + 1);
+                }
+            };
+
+            traceException(exception.InnerException, 0);
+            return sb;
         }
 
         protected IEnumerable<string> GetTransformedUrls()
@@ -333,10 +507,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
                     if (url.Contains("$("))
                     {
-                        foreach (var variable in GlobalVariables)
-                        {
-                            url = url.Replace("$(" + variable.Key + ")", variable.Value);
-                        }
+                        url = GlobalVariables.Aggregate(url, (current, variable) => current.Replace("$(" + variable.Key + ")", variable.Value));
                     }
                     if (!url.StartsWith("http://") && !url.StartsWith("https://"))
                         url = "http://" + url;
@@ -347,77 +518,162 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
         public void Add(IndexUpdateContext context)
         {
-            _logger.InfoFormat("Crawler rebuild called, going to crawl {0} urls", _urls.Count);
+            if (_logger != null) _logger.InfoFormat("Crawler rebuild called, going to crawl {0} urls", _urls.Count);
             Crawl(context);
         }
         
         //IPipelineStep.Process
         public void Process(Crawler crawler, PropertyBag propertyBag)
         {
-            var updateCrawler = crawler as UpdateContextAwareCrawler;
-            if (updateCrawler == null)
+            try
             {
-                _logger.Info("Crawler is not an UpdateContextAwareCrawler, we can't deal with this crawler");
-                return;
-            }
-
-            string id = propertyBag.Step.Uri.PathAndQuery;
-
-            GetIndexWriter(updateCrawler.UpdateContext).DeleteDocuments(new Term(BuiltinFields.Path, id));
-            if (propertyBag.StatusCode == System.Net.HttpStatusCode.OK)
-            {
-                //this should have been done by NCrawler, but let's do it here... could move this to seperate crawlerrulesservice class, but then we'd have to download the content again
-                if (crawler.AdhereToRobotRules)
+                var updateCrawler = crawler as UpdateContextAwareCrawler;
+                if (updateCrawler == null)
                 {
-                    var htmlDocProp = propertyBag["HtmlDoc"];
-                    if (htmlDocProp != null && htmlDocProp.Value != null)
-                    {
-                        var htmlDoc = htmlDocProp.Value as HtmlDocument;
-                        if (htmlDoc != null)
-                        {
-                            var metaNodes = htmlDoc.DocumentNode.SelectNodes("//meta");
-                            if (metaNodes != null)
-                                foreach (var metaNode in metaNodes)
-                                {
-                                    var name = metaNode.GetAttributeValue("name", string.Empty);
-                                    var content = metaNode.GetAttributeValue("content", string.Empty);
-                                    if (("robots".Equals(name, StringComparison.InvariantCultureIgnoreCase) || "internal-index".Equals(name, StringComparison.InvariantCultureIgnoreCase))
-                                        && !string.IsNullOrEmpty(content) && content.ToLowerInvariant().Contains("noindex"))
-                                    {
-                                        _logger.InfoFormat("Skipping {0}, encountered meta tag {1}='{2}'", id, name, content);
-                                        return;
-                                    }
-                                }
+                    if (_logger != null)
+                        _logger.Info("Crawler is not an UpdateContextAwareCrawler, we can't deal with this crawler");
+                    return;
+                }
 
-                            var canonicalNodes = htmlDoc.DocumentNode.SelectNodes("//link[@rel='canonical']");
-                            var canonicalTag = canonicalNodes != null 
-                                               ? canonicalNodes.FirstOrDefault()
-                                               : null;
-                            if (canonicalTag != null)
-                            {
-                                var canonicalLink = canonicalTag.GetAttributeValue("href", string.Empty);
-                                if (!canonicalLink.ToLower().Contains(id.ToLower()))
-                                {
-                                    _logger.InfoFormat("Skipping {0}, encountered canonical tag to '{1}'", id, canonicalLink);
-                                    return;
-                                }
-                            }
+                Uri currentUri = ExtractCurrentUri(propertyBag);
+
+                string id = currentUri.PathAndQuery;
+                String depthString = CreateDepthString(propertyBag.Step.Depth);
+
+                if (_logger != null)
+                    _logger.Info(String.Format("{0}| Process | HTTP-{1} | {2}", depthString, propertyBag.StatusCode, id));
+
+                lock (updateCrawler.UpdateContext)
+                {
+                    GetIndexWriter(updateCrawler.UpdateContext).DeleteDocuments(new Term(BuiltinFields.Path, id));
+                    if (propertyBag.StatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        //this should have been done by NCrawler, but let's do it here... could move this to seperate crawlerrulesservice class, but then we'd have to download the content again
+                        String message;
+                        if (crawler.AdhereToRobotRules &&
+                            EvaluateSkipConditions(propertyBag, updateCrawler, id, out message))
+                        {
+                            if (_logger != null)
+                                _logger.Info(String.Format("{0}| Skipped | {1} | {2}", depthString, message, id));
+                            return;
                         }
+
+                        var document = CreateDocument(propertyBag, updateCrawler.RunningContextId, id);
+                        updateCrawler.UpdateContext.AddDocument(document);
+
+                        //Raise event that the givven document is updated
+                        Event.RaiseEvent("SiteCrawler:DocumentUpdated",
+                                         new CrawlDocumentUpdatedEventArgs(updateCrawler, document));
+
+                        if (_logger != null) _logger.InfoFormat("{0}| Add/Update | {1}", depthString, id);
+                    }
+                    else if (propertyBag.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        if (_logger != null) _logger.InfoFormat("Crawler encoutered 404 for [{0}]", id);
+                        //Raise an event that the Document was not found 
+                        Event.RaiseEvent("SiteCrawler:DocumentNotFound",
+                                         new CrawlDocumentErrorEventArgs(updateCrawler, id, propertyBag));
+                    }
+                    else
+                    {
+                        if (_logger != null)
+                            _logger.WarnFormat("Crawler encountered status {0} ({1}) for document {2}",
+                                               propertyBag.StatusCode.ToString(), propertyBag.StatusDescription, id);
+                        //Raise an event that the document request returned an error
+                        Event.RaiseEvent("SiteCrawler:DocumentError",
+                                         new CrawlDocumentErrorEventArgs(updateCrawler, id, propertyBag));
+                    }
+                }
+            }
+            catch (Exception crawlExeption)
+            {
+                if (_logger != null) _logger.Error(GetExceptionLog(crawlExeption).ToString());
+
+                throw;
+            }
+        }
+
+        private Uri ExtractCurrentUri(PropertyBag propertyBag)
+        {
+            if (propertyBag.ResponseUri != null) return propertyBag.ResponseUri;
+            return propertyBag.Step.Uri;
+        }
+
+        private static String CreateDepthString(int p)
+        {
+            var sb = new StringBuilder();
+            for (var x = 0; x < p; x++)
+            {
+                sb.Append("-");
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Evaluates if the current document must be added or if it can be skipped
+        /// </summary>
+        /// <param name="propertyBag"></param>
+        /// <param name="updateCrawler"></param>
+        /// <param name="id"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        protected bool EvaluateSkipConditions(PropertyBag propertyBag, UpdateContextAwareCrawler updateCrawler, string id, out String message)
+        {
+            message = String.Empty;
+            var htmlDocProp = propertyBag["HtmlDoc"];
+            if (htmlDocProp != null && htmlDocProp.Value != null)
+            {
+                var htmlDoc = htmlDocProp.Value as HtmlDocument;
+                if (htmlDoc != null)
+                {
+                    //Raise a custom event indicating that a document is analysed
+                    var args = new CrawlDocumentAnalyseEventArgs(updateCrawler, htmlDoc);
+                    Event.RaiseEvent("SiteCrawler:DocumentAnalyse", args);
+                    //When the Skip field is set the event handlers have indicated that this document should be skipped
+                    if (args.Skip)
+                    {
+                        message = "CrawlDocumentAnalyse Skip = true";
+                        return true;
+                    }
+
+                    if (EvaluateSkipConditions(htmlDoc, id, out message)) return true;
+                }
+            }
+            return false;
+        }
+
+        protected bool EvaluateSkipConditions(HtmlDocument htmlDoc, string id, out string message)
+        {
+            message = String.Empty;
+            var metaNodes = htmlDoc.DocumentNode.SelectNodes("//meta");
+            if (metaNodes != null)
+                foreach (var metaNode in metaNodes)
+                {
+                    var name = metaNode.GetAttributeValue("name", string.Empty);
+                    var content = metaNode.GetAttributeValue("content", string.Empty);
+                    if (("robots".Equals(name, StringComparison.InvariantCultureIgnoreCase) ||
+                         "internal-index".Equals(name, StringComparison.InvariantCultureIgnoreCase))
+                        && !string.IsNullOrEmpty(content) && content.ToLowerInvariant().Contains("noindex"))
+                    {
+                        message = String.Format("encountered meta tag {0}='{1}'", name, content);
+                        return true;
                     }
                 }
 
-                updateCrawler.UpdateContext.AddDocument(CreateDocument(propertyBag, updateCrawler.RunningContextId, id));
-                _logger.InfoFormat("Add/Update [{0}]", id);
-
-            }
-            else if (propertyBag.StatusCode == System.Net.HttpStatusCode.NotFound)
+            var canonicalNodes = htmlDoc.DocumentNode.SelectNodes("//link[@rel='canonical']");
+            var canonicalTag = canonicalNodes != null
+                                   ? canonicalNodes.FirstOrDefault()
+                                   : null;
+            if (canonicalTag != null)
             {
-                _logger.InfoFormat("Crawler encoutered 404 for [{0}]",id);
+                var canonicalLink = canonicalTag.GetAttributeValue("href", string.Empty);
+                if (!canonicalLink.ToLower().Contains(id.ToLower()))
+                {
+                    message = String.Format("encountered canonical tag to '{0}'", canonicalLink);
+                    return true;
+                }
             }
-            else
-            {
-                _logger.WarnFormat("Crawler encountered status {0} ({1}) for document {2}", propertyBag.StatusCode.ToString(),  propertyBag.StatusDescription, id);
-            }
+            return false;
         }
 
         protected virtual Document CreateDocument(PropertyBag propertyBag, ShortID runningContextId, string documentId)
@@ -430,24 +686,33 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
         protected virtual void AddContent(Document document, PropertyBag propertyBag)
         {
-            document.Add(CreateTextField(BuiltinFields.Content, propertyBag.Text));
-            document.Add(CreateTextField(BuiltinFields.Content, propertyBag.Title));
+            document.Add(CreateTextField(BuiltinFields.Content, ValueOrEmpty(propertyBag.Text)));
+            document.Add(CreateTextField(BuiltinFields.Content, ValueOrEmpty(propertyBag.Title)));
 
             if (propertyBag["Meta"] != null)
             {
-                var metaTags = propertyBag["Meta"].Value as string[];
-                foreach (var metaTag in metaTags)
+                var p = propertyBag["Meta"];
+                if (p != null)
                 {
-                    if (metaTag.StartsWith("keywords:", StringComparison.InvariantCultureIgnoreCase))
+                    var metaTags = p.Value as string[];
+                    if (metaTags != null)
                     {
-                        document.Add(CreateTextField(BuiltinFields.Content, metaTag.Substring("keywords:".Length)));
-                    }
-                    else if (metaTag.StartsWith("description:", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        string description = metaTag.Substring("description:".Length);
-                        document.Add(CreateTextField(BuiltinFields.Content, description));
-                        document.Add(CreateTextField(CustomFields.Description, description));
-                        document.Add(CreateDataField(CustomFields.Description, description));
+                        foreach (var metaTag in metaTags)
+                        {
+                            if (metaTag.StartsWith("keywords:", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                String keywordsValue = ValueOrEmpty(metaTag.Substring("keywords:".Length));
+                                document.Add(CreateTextField(BuiltinFields.Content, keywordsValue));
+                            }
+                            else if (metaTag.StartsWith("description:", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                string description = ValueOrEmpty(metaTag.Substring("description:".Length));
+
+                                document.Add(CreateTextField(BuiltinFields.Content, description));
+                                document.Add(CreateTextField(CustomFields.Description, description));
+                                document.Add(CreateDataField(CustomFields.Description, description));
+                            }
+                        }
                     }
                 }
             }
@@ -467,10 +732,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
                         //Using security disabler for secured search
                         using (new SecurityDisabler())
                         {
-                            var db = Factory.GetDatabase(itemUri.DatabaseName);
-                            var item = db.GetItem(new DataUri(itemUri));
-                            AddVersionIdentifiers(item, document);
-                            AddSpecialFields(item, document);
+                            var item = Database.GetItem(itemUri);
+                            if (item != null)
+                            {
+                                AddVersionIdentifiers(item, document);
+                                AddSpecialFields(item, document);
+                            }
+                            else
+                            {
+                                throw new SiteCoreItemNotFoundException(itemId, itemUri);
+                            }
                         }
                     }
                 }
@@ -511,16 +782,22 @@ namespace Efocus.Sitecore.LuceneWebSearch
             //                                 it is not possible to search for values in such fields.
             //
             // These functions are just helpers, and it is possible to use just Lucene.Net API here.
-            document.Add(this.CreateTextField(BuiltinFields.Name, propertyBag.Title));
-            document.Add(this.CreateDataField(BuiltinFields.Name, propertyBag.Title));
-            document.Add(this.CreateValueField(CustomFields.UpdateContextId, runningContextId.ToString().ToLower()));
-            document.Add(this.CreateDataField(CustomFields.Depth, propertyBag.Step.Depth.ToString()));
             document.Add(this.CreateValueField(BuiltinFields.Path, id));
             document.Add(this.CreateDataField(BuiltinFields.Path, id));
-            document.Add(this.CreateTextField(BuiltinFields.Tags, this.Tags));
-            document.Add(this.CreateDataField(BuiltinFields.Tags, this.Tags));
-            document.Add(CreateDataField(BuiltinFields.Group, id));
+
+            document.Add(this.CreateTextField(BuiltinFields.Name, ValueOrEmpty(propertyBag.Title)));
+            document.Add(this.CreateDataField(BuiltinFields.Name, ValueOrEmpty(propertyBag.Title)));
+            document.Add(this.CreateValueField(CustomFields.UpdateContextId, runningContextId.ToString().ToLower()));
+            document.Add(this.CreateDataField(CustomFields.Depth, value: propertyBag.Step.Depth.ToString(CultureInfo.InvariantCulture)));
+            document.Add(this.CreateTextField(BuiltinFields.Tags, ValueOrEmpty(Tags)));
+            document.Add(this.CreateDataField(BuiltinFields.Tags, ValueOrEmpty(Tags)));
+            document.Add(CreateDataField(BuiltinFields.Group, ValueOrEmpty(id)));
             document.Boost = this.Boost;
+        }
+
+        private string ValueOrEmpty(string p)
+        {
+            return p ?? "";
         }
 
         protected virtual void AddVersionIdentifiers(Item item, Document document)
@@ -538,23 +815,24 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
         protected virtual void AddSpecialFields(Item item, Document document)
         {
-            Assert.ArgumentNotNull((object)document, "document");
-            Assert.ArgumentNotNull((object)item, "item");
-            string displayName = item.Appearance.DisplayName;
-            Assert.IsNotNull((object)displayName, "Item's display name is null.");
-            document.Add(this.CreateTextField(BuiltinFields.Name, item.Name));
-            document.Add(this.CreateTextField(BuiltinFields.Name, displayName));
-            document.Add(this.CreateValueField(BuiltinFields.Icon, item.Appearance.Icon));
-            document.Add(this.CreateTextField(BuiltinFields.Creator, item.Statistics.CreatedBy));
-            document.Add(this.CreateTextField(BuiltinFields.Editor, item.Statistics.UpdatedBy));
-            document.Add(this.CreateTextField(BuiltinFields.AllTemplates, this.GetAllTemplates(item)));
-            document.Add(this.CreateTextField(BuiltinFields.TemplateName, item.TemplateName));
-            if (this.IsHidden(item))
-                document.Add(this.CreateValueField(BuiltinFields.Hidden, "1"));
-            document.Add(this.CreateValueField(BuiltinFields.Created, item[FieldIDs.Created]));
-            document.Add(this.CreateValueField(BuiltinFields.Updated, item[FieldIDs.Updated]));
-            document.Add(this.CreateTextField(BuiltinFields.Path, this.GetItemPath(item)));
-            document.Add(this.CreateTextField(BuiltinFields.Links, this.GetItemLinks(item)));
+            if (item != null)
+            {
+                string displayName = item.Appearance.DisplayName;
+                Assert.IsNotNull((object) displayName, "Item's display name is null.");
+                document.Add(this.CreateTextField(BuiltinFields.Name, item.Name));
+                document.Add(this.CreateTextField(BuiltinFields.Name, displayName));
+                document.Add(this.CreateValueField(BuiltinFields.Icon, item.Appearance.Icon));
+                document.Add(this.CreateTextField(BuiltinFields.Creator, item.Statistics.CreatedBy));
+                document.Add(this.CreateTextField(BuiltinFields.Editor, item.Statistics.UpdatedBy));
+                document.Add(this.CreateTextField(BuiltinFields.AllTemplates, this.GetAllTemplates(item)));
+                document.Add(this.CreateTextField(BuiltinFields.TemplateName, item.TemplateName));
+                if (this.IsHidden(item))
+                    document.Add(this.CreateValueField(BuiltinFields.Hidden, "1"));
+                document.Add(this.CreateValueField(BuiltinFields.Created, item[FieldIDs.Created]));
+                document.Add(this.CreateValueField(BuiltinFields.Updated, item[FieldIDs.Updated]));
+                document.Add(this.CreateTextField(BuiltinFields.Path, this.GetItemPath(item)));
+                document.Add(this.CreateTextField(BuiltinFields.Links, this.GetItemLinks(item)));
+            }
             if (this.Tags.Length <= 0)
                 return;
         }

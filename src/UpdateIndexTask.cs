@@ -22,23 +22,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     {
                         try
                         {
-                            var index = SearchManager.GetIndex(indexName);
-                            if (index != null)
+                            var index = SearchManager.GetIndex(indexName) ?? new Index(indexName, String.Format("__{0}", indexName)); ;
+                            if ("update".Equals(item["Action"], StringComparison.InvariantCultureIgnoreCase))
                             {
-                                IndexAction action;
-                                Enum.TryParse(item["Action"], true, out action);
-
-                                var args = new CustomEventArgs {Item = item};
-
-                                switch (action)
-                                {
-                                    case IndexAction.Update:
-                                        Event.RaiseEvent("efocus:updateindex:" + index.Name.ToLower(), args);
-                                        break;
-                                    default:
-                                        Event.RaiseEvent("efocus:rebuildindex:" + index.Name.ToLower(), args);
-                                        break;
-                                }
+                                Event.RaiseEvent(String.Format("efocus:updateindex:{0}", index.Name.ToLower()));
+                                Event.RaiseEvent(String.Format("efocus:updateindex:{0}:remote", index.Name.ToLower()));
+                            }
+                            else
+                            {
+                                Event.RaiseEvent(String.Format("efocus:rebuildindex:{0}", index.Name.ToLower()));
+                                Event.RaiseEvent(String.Format("efocus:rebuildindex:{0}:remote", index.Name.ToLower()));
                             }
                         }
                         catch (Exception exception)
@@ -50,10 +43,5 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 }
             }
         }
-    }
-
-    public class CustomEventArgs : EventArgs
-    {
-        public Item Item { get; set; }
     }
 }
