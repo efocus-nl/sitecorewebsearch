@@ -95,7 +95,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
         private bool _isrunning = false;
         private bool _updateIndexRunning = false;
         private object _updateIndexRunningLock = new object();
-        private Item _indexTaskConfiguration;
 
 #region configurable settings
         public bool AdhereToRobotRules { get; set; }
@@ -273,28 +272,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
             index.Rebuild();
         }
 
-        //protected virtual void RebuildIndex(object sender, EventArgs args)
-        //{
-        //    var customArgs = Event.ExtractParameter(args, 0) as CustomEventArgs;
-
-        //    if (customArgs != null && customArgs.Item != null)
-        //        _indexTaskConfiguration = customArgs.Item;
-        //    else
-        //    {
-        //        _logger.InfoFormat("IndexTaskConfiguration item could not be found, aborting");
-        //        return;
-        //    }
-
-        //    if (string.IsNullOrEmpty(_indexTaskConfiguration["Index"]))
-        //    {
-        //        _logger.InfoFormat("Index is not defined, aborting");
-        //        return;
-        //    }
-
-        //    var index = SearchManager.GetIndex(_indexTaskConfiguration["Index"]);
-        //    index.Rebuild();
-        //}
-
         protected virtual void UpdateIndex()
         {
             if (_updateIndexRunning)
@@ -353,43 +330,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 {
                     if (_logger != null) _logger.InfoFormat("Starting url: {0}", url);
                     var documentProcessor = (_logger != null && _logger.IsDebugEnabled) ? new LogHtmlDocumentProcessor(_logger, _indexFilters, _followFilters) : new HtmlDocumentProcessor(_indexFilters, _followFilters);
-                    ID loginPageId;
-
-                    //Let the crawler login first, if the required values are available
-                    if (!string.IsNullOrEmpty(_indexTaskConfiguration["UserFieldName"]) && !string.IsNullOrEmpty(_indexTaskConfiguration["User"]) &&
-                        !string.IsNullOrEmpty(_indexTaskConfiguration["PassFieldName"]) && !string.IsNullOrEmpty(_indexTaskConfiguration["Pass"]) &&
-                        !string.IsNullOrEmpty(_indexTaskConfiguration["LoginPage"]) && ID.TryParse(_indexTaskConfiguration["LoginPage"], out loginPageId) &&
-                        _indexTaskConfiguration.Database.GetItem(loginPageId) != null)
-                    {
-                        var postData = new NameValueCollection
-                        {
-                            {_indexTaskConfiguration["UserFieldName"], _indexTaskConfiguration["User"]},
-                            {_indexTaskConfiguration["PassFieldName"], _indexTaskConfiguration["Pass"]},
-                        };
-
-                        Item loginPage = _indexTaskConfiguration.Database.GetItem(loginPageId);
-                        SiteInfo loginSiteInfo = null;
-                        if (Factory.GetSiteInfoList().Any(x => loginPage.Paths.FullPath.StartsWith(x.RootPath)))
-                            loginSiteInfo = Factory.GetSiteInfoList().OrderByDescending(x => x.RootPath.Count(f => f == '/')).First(x => loginPage.Paths.FullPath.StartsWith(x.RootPath));
-
-                        SiteContext loginSiteContex = null;
-                        if (loginSiteInfo != null)
-                            loginSiteContex = Factory.GetSite(loginSiteInfo.Name);
-
-                        CookieContainer authorizedCookies = null;
-                        if(loginSiteContex != null)
-                            authorizedCookies = GetAuthorizationCookie(new Uri(LinkManager.GetItemUrl(loginPage, new UrlOptions() { Site = loginSiteContex })), postData);
-                        else
-                            authorizedCookies = GetAuthorizationCookie(new Uri(LinkManager.GetItemUrl(loginPage)), postData);
-
-                        var modules = new Module[] { new CustomDownloaderModule(authorizedCookies) };
-                        NCrawlerModule.Setup(modules);
-                        if (_logger != null) _logger.InfoFormat(authorizedCookies.Count > 2
-                            ? "Crawler is logged in, performing a secured search"
-                            : "Crawler could not login, going to crawl without");
-                    }
-                    else
-                        if (_logger != null) _logger.InfoFormat("Required values for the crawler to login are not met, going to crawl without");
 
                     using (var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url), new LogLoggerBridge(_logger), documentProcessor, this))
                     {
