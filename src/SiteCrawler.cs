@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
@@ -28,18 +29,24 @@ using NCrawler.Services;
 using Sitecore;
 using Sitecore.Configuration;
 using Sitecore.Data;
+using Sitecore.Data.Indexing;
 using Sitecore.Data.Items;
 using Sitecore.Diagnostics;
 using Sitecore.Events;
+using Sitecore.Extensions;
 using Sitecore.Links;
 using Sitecore.Search;
 using Sitecore.Search.Crawlers;
 using Sitecore.SecurityModel;
 using Sitecore.Events;
+using Sitecore.Shell.Framework.Commands;
 using Sitecore.Sites;
 using Sitecore.Web;
 using Module = Autofac.Module;
 using CrawlFinishedEventArgs = Efocus.Sitecore.LuceneWebSearch.Support.CrawlFinishedEventArgs;
+using Directory = Lucene.Net.Store.Directory;
+using FSDirectory = Sitecore.Search.FSDirectory;
+using Index = Sitecore.Search.Index;
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
@@ -283,6 +290,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 _updateIndexRunning = true;
                 try
                 {
+                    CreateIndexBackup();
                     using (var updateContext = _index.CreateUpdateContext())
                     {
                         Crawl(updateContext);
@@ -301,11 +309,46 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 catch (Exception crawlExeption)
                 {
                     _logger.Error(GetExceptionLog(crawlExeption).ToString());
+                    //TODO: should we restore backup in some exception cases?
                 }
                 finally
                 {
                     _updateIndexRunning = false;
+                    DeleteBackupFolder();
                 }
+            }
+        }
+
+        private void DeleteBackupFolder()
+        {
+            var dir = _index.Directory.GetPath() + ".backup";
+            if (System.IO.Directory.Exists(dir))
+                System.IO.Directory.Delete(dir, true);
+        }
+
+        private void CreateIndexBackup()
+        {
+            var dir = _index.Directory.GetPath();
+            if (String.IsNullOrEmpty(dir))
+            {
+                _logger.InfoFormat("Cannot get the path of the current lucene directory: {0}", _index.Directory);
+            }
+            else if (!_index.Directory.Exists())
+            {
+                _logger.InfoFormat("Websearch: Lucene directory does not exist yet, skipping backup {0}", _index.Directory);
+            }
+            else
+            {
+                var backup = dir + ".backup";
+                if (System.IO.Directory.Exists(backup))
+                {
+                    _logger.WarnFormat(
+                        "Websearch: Lucene directory backup already exists!! {0} -> We're going to delete that now", backup);
+                    System.IO.Directory.Delete(backup, true);
+                }
+                System.IO.Directory.CreateDirectory(backup);
+                using (var backupDir = new FSDirectory(new DirectoryInfo(backup), new SitecoreLockFactory(backup)))
+                    Directory.Copy(_index.Directory, backupDir, false);
             }
         }
 
