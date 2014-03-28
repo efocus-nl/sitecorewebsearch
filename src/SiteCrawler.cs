@@ -252,7 +252,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
         private void InitializeDefaultRebuildTriggers(Index index)
         {
-            _triggers.Add(String.Format("efocus:rebuildindex:{0}", index.Name.ToLower()));
+            _rebuildTriggers.Add(String.Format("efocus:rebuildindex:{0}", index.Name.ToLower()));
         }
 
         private void InitializeDefaultTriggers(Index index)
@@ -310,6 +310,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 {
                     _logger.Error(GetExceptionLog(crawlExeption).ToString());
                     //TODO: should we restore backup in some exception cases?
+                    //RestoreIndexBackup();
                 }
                 finally
                 {
@@ -321,19 +322,19 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
         private void DeleteBackupFolder()
         {
-            var dir = _index.Directory.GetPath() + ".backup";
+            var dir = _index.Directory.GetPath().Split(new[] { _index.Name }, StringSplitOptions.None)[0] + _index.Name + ".backup";
             if (System.IO.Directory.Exists(dir))
                 System.IO.Directory.Delete(dir, true);
         }
 
         private void CreateIndexBackup()
         {
-            var dir = _index.Directory.GetPath();
+            var dir = _index.Directory.GetPath().Split(new [] { _index.Name }, StringSplitOptions.None)[0] + _index.Name;
             if (String.IsNullOrEmpty(dir))
             {
                 _logger.InfoFormat("Cannot get the path of the current lucene directory: {0}", _index.Directory);
             }
-            else if (!_index.Directory.Exists())
+            else if (!System.IO.Directory.Exists(dir))
             {
                 _logger.InfoFormat("Websearch: Lucene directory does not exist yet, skipping backup {0}", _index.Directory);
             }
@@ -347,8 +348,67 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     System.IO.Directory.Delete(backup, true);
                 }
                 System.IO.Directory.CreateDirectory(backup);
-                using (var backupDir = new FSDirectory(new DirectoryInfo(backup), new SitecoreLockFactory(backup)))
-                    Directory.Copy(_index.Directory, backupDir, false);
+                DirectoryCopy(dir, backup, true);
+                //using (var backupDir = new FSDirectory(new DirectoryInfo(backup), new SitecoreLockFactory(backup)))
+                //    Directory.Copy(_index.Directory, backupDir, false);
+            }
+        }
+
+        private void RestoreIndexBackup()
+        {
+            var dir = _index.Directory.GetPath().Split(new[] { _index.Name }, StringSplitOptions.None)[0] + _index.Name;
+            var backup = dir + ".backup";
+            if (String.IsNullOrEmpty(backup))
+            {
+                _logger.InfoFormat("Cannot get the path of the current lucene backup directory: {0}", _index.Directory);
+            }
+            else
+            {
+                if(System.IO.Directory.Exists(dir))
+                {
+                    _logger.WarnFormat("Websearch: Lucene directory already exists!! {0} -> We're going to delete that now", dir);
+                    System.IO.Directory.Delete(dir, true);
+                }
+                System.IO.Directory.CreateDirectory(dir);
+                DirectoryCopy(backup, dir, true);
+                //using(var backupDir = new FSDirectory(new DirectoryInfo(backup), new SitecoreLockFactory(backup)))
+                //    Directory.Copy(backupDir, _index.Directory, false);
+            }
+        }
+
+        private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
+        {
+            // Get the subdirectories for the specified directory.
+            DirectoryInfo dir = new DirectoryInfo(sourceDirName);
+            DirectoryInfo[] dirs = dir.GetDirectories();
+
+            if (!dir.Exists)
+            {
+                throw new DirectoryNotFoundException("Source directory does not exist or could not be found: " + sourceDirName);
+            }
+
+            // If the destination directory doesn't exist, create it. 
+            if (!System.IO.Directory.Exists(destDirName))
+            {
+                System.IO.Directory.CreateDirectory(destDirName);
+            }
+
+            // Get the files in the directory and copy them to the new location.
+            FileInfo[] files = dir.GetFiles();
+            foreach (FileInfo file in files)
+            {
+                string temppath = Path.Combine(destDirName, file.Name);
+                file.CopyTo(temppath, false);
+            }
+
+            // If copying subdirectories, copy them and their contents to new location. 
+            if (copySubDirs)
+            {
+                foreach (DirectoryInfo subdir in dirs)
+                {
+                    string temppath = Path.Combine(destDirName, subdir.Name);
+                    DirectoryCopy(subdir.FullName, temppath, copySubDirs);
+                }
             }
         }
 
