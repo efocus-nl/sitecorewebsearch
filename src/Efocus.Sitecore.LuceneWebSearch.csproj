@@ -74,8 +74,10 @@
     <Compile Include="CustomWebDownloader.cs" />
     <Compile Include="Enums\IndexAction.cs" />
     <Compile Include="FixedSearchContext.cs" />
+    <Compile Include="Helpers\DirectoryHelper.cs" />
     <Compile Include="HtmlDocumentProcessor.cs" />
     <Compile Include="LogHtmlDocumentProcessor.cs" />
+    <Compile Include="Pipelines\RestoreIndexesResolver.cs" />
     <Compile Include="Searcher.cs" />
     <Compile Include="SiteCoreItemNotfoundException.cs" />
     <Compile Include="SitecoreLogger.cs" />
