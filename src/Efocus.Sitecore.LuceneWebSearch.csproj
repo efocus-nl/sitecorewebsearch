@@ -67,9 +67,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CookiesAwareWebClient.cs">
-      <SubType>Component</SubType>
-    </Compile>
+    <Compile Include="CookiesAwareWebClient.cs" />
     <Compile Include="CustomDownloaderModule.cs" />
     <Compile Include="CustomWebDownloader.cs" />
     <Compile Include="Enums\IndexAction.cs" />
@@ -95,12 +93,6 @@
     <Compile Include="UpdateIndexTask.cs" />
     <Compile Include="UpdateContextAwareCrawler.cs" />
     <Compile Include="WebSearchResult.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\Efocus.MailTemplates\src\Efocus.Mailtemplates.csproj">
-      <Project>{f2e9e3ef-6912-4779-8fb5-cc3f747390f7}</Project>
-      <Name>Efocus.Mailtemplates</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
