@@ -38,25 +38,25 @@ namespace Efocus.Sitecore.LuceneWebSearch
             return Query(GetFullTextQuery(query), out totalResults, rootItem, start, count, sort, templateId);
         }
 
-        public BooleanQuery GetFullTextQuery(string query, float minimumSimilarity = 0.5f)
+        public BooleanQuery GetFullTextQuery(string query, float minimumSimilarity = 0.5f, float boostTitle = 1.5f)
         {
             query = QueryParser.Escape(query);
             var textQueries = new BooleanQuery();
             var hasMoreWords = query.Contains(" ");
-            textQueries.Add(GetFullTextQuery(query, hasMoreWords ? 0.7f : 0, minimumSimilarity), Occur.SHOULD);
+            textQueries.Add(GetFullTextQueryOnWord(query, hasMoreWords ? 0.7f : 0, minimumSimilarity), Occur.SHOULD);
             if (hasMoreWords)
             {
                 var parts = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var part in parts)
                 {
-                    textQueries.Add(GetFullTextQuery(part, 0, 0.7f), Occur.SHOULD);
+                    textQueries.Add(GetFullTextQueryOnWord(part, 0, 0.7f, boostTitle), Occur.SHOULD);
                 }
             }
 
             return textQueries;
         }
         
-        public BooleanQuery GetFullTextQuery(string query, float extraBoost, float minimumSimilarity, float boostTitle = 1.5f)
+        protected virtual BooleanQuery GetFullTextQueryOnWord(string query, float extraBoost, float minimumSimilarity, float boostTitle = 1.5f)
         {
             query = QueryParser.Escape(query);
             var boolq = new BooleanQuery();
