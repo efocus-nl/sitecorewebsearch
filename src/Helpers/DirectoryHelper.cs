@@ -1,64 +1,75 @@
 ﻿using System;
 using System.IO;
+using BoC.Logging;
 
 namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 {
     public class DirectoryHelper
     {
-        public static void DeleteDirectory(string dir)
+        private ILogger _logger;
+
+        public DirectoryHelper(ILogger logger)
         {
-            if (Directory.Exists(dir))
-                Directory.Delete(dir, true);
+            _logger = logger;
         }
 
-        public static void DeleteBackupDirectory(string dir)
+        public void DeleteDirectory(string dir)
         {
+            if (!Directory.Exists(dir)) return;
+            Directory.Delete(dir, true);
+            _logger.InfoFormat("Backup Manager: Directory {0} deleted", dir);
+        }
+
+        public void DeleteBackupDirectory(string dir)
+        {
+            _logger.InfoFormat("Backup Manager: Deleting backup directory for: {0}", dir);
             DeleteDirectory(dir + ".backup");
         }
 
-        public static void CreateDirectoryBackup(string dir)
+        public void CreateDirectoryBackup(string dir)
         {
             if (String.IsNullOrEmpty(dir))
             {
-                //_logger.InfoFormat("Cannot get the path of the current lucene directory: {0}", _index.Directory);
+                _logger.InfoFormat("Backup Manager: Cannot get the path of the current lucene directory: {0}", dir);
             }
             else if (!Directory.Exists(dir))
             {
-                //_logger.InfoFormat("Websearch: Lucene directory does not exist yet, skipping backup {0}", _index.Directory);
+                _logger.InfoFormat("Backup Manager: Lucene directory does not exist yet, skipping backup {0}", dir);
             }
             else
             {
                 var backup = dir + ".backup";
                 if (Directory.Exists(backup))
                 {
-                    //_logger.WarnFormat("Websearch: Lucene directory backup already exists!! {0} -> We're going to delete that now", backup);
+                    _logger.WarnFormat("Backup Manager: Lucene directory backup already exists!! {0} -> We're going to delete that now", backup);
                     Directory.Delete(backup, true);
                 }
                 Directory.CreateDirectory(backup);
                 CopyDirectory(dir, backup, true);
+                _logger.InfoFormat("Backup Manager: Backup created for: {0}", dir);
             }
         }
 
-        public static void RestoreDirectoryBackup(string dir)
+        public bool RestoreDirectoryBackup(string dir)
         {
             string backup = dir + ".backup";
-            if (String.IsNullOrEmpty(backup))
+            if (Directory.Exists(dir))
             {
-                //_logger.InfoFormat("Cannot get the path of the current lucene backup directory: {0}", _index.Directory);
-            }
-            else
-            {
+                _logger.WarnFormat("Backup Manager: Lucene directory already exists!! {0} -> We're going to delete that now", dir);
+                Directory.Delete(dir, true);
                 if (Directory.Exists(dir))
                 {
-                    //_logger.WarnFormat("Websearch: Lucene directory already exists!! {0} -> We're going to delete that now", dir);
-                    Directory.Delete(dir, true);
+                    _logger.InfoFormat("Backup Manager: Could not delete directory: {0}", dir);
+                    return false;
                 }
-                Directory.CreateDirectory(dir);
-                CopyDirectory(backup, dir, true);
             }
+            Directory.CreateDirectory(dir);
+            CopyDirectory(backup, dir, true);
+            _logger.InfoFormat("Backup Manager: Backup restored for: {0}", dir);
+            return true;
         }
 
-        public static void CopyDirectory(string sourceDirName, string destDirName, bool copySubDirs)
+        public void CopyDirectory(string sourceDirName, string destDirName, bool copySubDirs)
         {
             // Get the subdirectories for the specified directory.
             DirectoryInfo dir = new DirectoryInfo(sourceDirName);
@@ -66,7 +77,7 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 
             if (!dir.Exists)
             {
-                throw new DirectoryNotFoundException("Source directory does not exist or could not be found: " + sourceDirName);
+                throw new DirectoryNotFoundException("Backup Manager: Source directory does not exist or could not be found: " + sourceDirName);
             }
 
             // If the destination directory doesn't exist, create it. 

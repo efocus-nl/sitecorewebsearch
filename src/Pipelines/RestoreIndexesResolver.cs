@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using BoC.InversionOfControl;
 using Efocus.Sitecore.LuceneWebSearch.Helpers;
 using Sitecore.Configuration;
 using Sitecore.IO;
@@ -14,13 +15,16 @@ namespace Efocus.Sitecore.LuceneWebSearch.Pipelines
             string indexesFolder = Settings.GetSetting("IndexFolder", FileUtil.MakePath(Settings.DataFolder, "/indexes"));
             DirectoryInfo indexesDirectoryInfo = new DirectoryInfo(indexesFolder);
             DirectoryInfo[] indexes = indexesDirectoryInfo.GetDirectories();
+
+            DirectoryHelper directoryHelper = IoC.Resolver.Resolve<DirectoryHelper>();
+
             foreach (DirectoryInfo index in indexes)
             {
                 if (index.Name.EndsWith(".backup"))
                 {
-                    DirectoryHelper.RestoreDirectoryBackup(
+                    directoryHelper.RestoreDirectoryBackup(
                         index.FullName.Split(new[] {".backup"}, StringSplitOptions.None)[0]);
-                    DirectoryHelper.DeleteDirectory(index.FullName);
+                    directoryHelper.DeleteDirectory(index.FullName);
                 }
             }
         }
