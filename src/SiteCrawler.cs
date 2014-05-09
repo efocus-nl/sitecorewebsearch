@@ -280,9 +280,12 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
                 var dir = _index.Directory.GetPath().Split(new[] { _index.Name }, StringSplitOptions.None)[0] + _index.Name;
 
+                DirectoryHelper directoryHelper = IoC.Resolver.Resolve<DirectoryHelper>();
+                bool errorOccured = false;
+
                 try
                 {
-                    DirectoryHelper.CreateDirectoryBackup(dir);
+                    directoryHelper.CreateDirectoryBackup(dir);
                     using (var updateContext = _index.CreateUpdateContext())
                     {
                         Crawl(updateContext);
@@ -300,14 +303,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 }
                 catch (Exception crawlExeption)
                 {
+                    errorOccured = true;
                     _logger.Error(GetExceptionLog(crawlExeption).ToString());
                     //TODO: should we only restore backup in some exception cases?
-                    DirectoryHelper.RestoreDirectoryBackup(dir);
+                    if (directoryHelper.RestoreDirectoryBackup(dir)) errorOccured = false; //if true you can delete the backup in the finally
                 }
                 finally
                 {
                     _updateIndexRunning = false;
-                    DirectoryHelper.DeleteBackupDirectory(dir);
+                    if(!errorOccured)
+                        directoryHelper.DeleteBackupDirectory(dir);
                 }
             }
         }
