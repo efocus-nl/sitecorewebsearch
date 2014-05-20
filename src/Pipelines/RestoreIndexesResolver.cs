@@ -14,6 +14,8 @@ namespace Efocus.Sitecore.LuceneWebSearch.Pipelines
         {
             string indexesFolder = Settings.GetSetting("IndexFolder", FileUtil.MakePath(Settings.DataFolder, "/indexes"));
             DirectoryInfo indexesDirectoryInfo = new DirectoryInfo(indexesFolder);
+            if (!indexesDirectoryInfo.Exists) return;
+
             DirectoryInfo[] indexes = indexesDirectoryInfo.GetDirectories();
 
             DirectoryHelper directoryHelper = IoC.Resolver.Resolve<DirectoryHelper>();
