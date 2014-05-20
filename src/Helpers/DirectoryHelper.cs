@@ -16,7 +16,17 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
         public void DeleteDirectory(string dir)
         {
             if (!Directory.Exists(dir)) return;
-            Directory.Delete(dir, true);
+
+            try
+            {
+                Directory.Delete(dir, true);
+            }
+            catch (Exception e)
+            {
+                _logger.InfoFormat("Backup Manager: Could not delete directory: {0}. Exception: {1}", dir, e);
+                return;
+            }
+
             _logger.InfoFormat("Backup Manager: Directory {0} deleted", dir);
         }
 
@@ -42,7 +52,15 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
                 if (Directory.Exists(backup))
                 {
                     _logger.WarnFormat("Backup Manager: Lucene directory backup already exists!! {0} -> We're going to delete that now", backup);
-                    Directory.Delete(backup, true);
+                    try
+                    {
+                        Directory.Delete(dir, true);
+                    }
+                    catch (Exception e)
+                    {
+                        //TODO: What should we do now that the backup dir is corrupted?
+                        _logger.InfoFormat("Backup Manager: Could not delete directory: {0}. Exception: {1}", backup, e);
+                    }
                 }
                 Directory.CreateDirectory(backup);
                 CopyDirectory(dir, backup, true);
@@ -56,7 +74,17 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
             if (Directory.Exists(dir))
             {
                 _logger.WarnFormat("Backup Manager: Lucene directory already exists!! {0} -> We're going to delete that now", dir);
-                Directory.Delete(dir, true);
+
+                try
+                {
+                    Directory.Delete(dir, true);
+                }
+                catch (Exception e)
+                {
+                    _logger.InfoFormat("Backup Manager: Could not delete directory: {0}. Exception: {1}", dir, e);
+                    return false;
+                }
+
                 if (Directory.Exists(dir))
                 {
                     _logger.InfoFormat("Backup Manager: Could not delete directory: {0}", dir);
