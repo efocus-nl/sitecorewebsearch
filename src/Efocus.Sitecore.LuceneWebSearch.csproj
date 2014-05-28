@@ -58,7 +58,7 @@
     </Reference>
     <Reference Include="NCrawler, Version=3.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(ModulesLibraryDir)\NCrawler\NCrawler.dll</HintPath>
+      <HintPath>..\Libs\NCrawler\NCrawler.dll</HintPath>
     </Reference>
     <Reference Include="Sitecore.Kernel, Version=6.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
