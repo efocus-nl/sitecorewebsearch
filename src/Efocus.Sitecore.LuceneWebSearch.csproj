@@ -15,6 +15,10 @@
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\..\..\</SolutionDir>
     <MSBuildTargetsDir Condition=" '$(MSBuildTargetsDir)' == '' ">$(SolutionDir)\scripts\build\</MSBuildTargetsDir>
     <RestorePackages>true</RestorePackages>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
   </PropertyGroup>
   <!--Custom-->
   <Import Project="$(MSBuildTargetsDir)\Global.props" Condition="Exists('$(MSBuildTargetsDir)\Global.props')" />
@@ -54,7 +58,7 @@
     </Reference>
     <Reference Include="NCrawler, Version=3.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Libs\NCrawler\NCrawler.dll</HintPath>
+      <HintPath>$(ModulesLibraryDir)\NCrawler\NCrawler.dll</HintPath>
     </Reference>
     <Reference Include="Sitecore.Kernel, Version=6.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
