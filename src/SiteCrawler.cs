@@ -99,7 +99,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
         public int MaximumCrawlDepth { get; set; }
         public int MaximumDocuments { get; set; }
         public TimeSpan MaximumCrawlTime { get; set; }
-        public int BoostTitle { get; set; }
         public string RegexExcludeFilter { get; set; }
         public string EventTrigger { get; set; }
         public UriComponents UriSensitivity { get; set; }
