@@ -660,6 +660,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
                                 document.Add(CreateTextField(CustomFields.Description, description));
                                 document.Add(CreateDataField(CustomFields.Description, description));
                             }
+                            else if (metaTag.StartsWith("efcrawler:extrafield:", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                //efcrawler:extrafield:templateid: value
+                                var extraField = metaTag.Substring("efcrawler:extrafield:".Length);
+                                extraField = extraField.Substring(0, extraField.IndexOf(':'));
+                                var fulllength = "efcrawler:extrafield:".Length + extraField.Length + 2; 
+                                string description = ValueOrEmpty(metaTag.Substring(fulllength));
+
+                                document.Add(CreateTextField(extraField, description));
+                            }
                         }
                     }
                 }
