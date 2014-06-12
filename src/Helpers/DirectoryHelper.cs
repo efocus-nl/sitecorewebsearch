@@ -1,6 +1,9 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using BoC.Logging;
+using Sitecore.Extensions;
+using Sitecore.Search;
 
 namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 {
@@ -54,7 +57,7 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
                     _logger.WarnFormat("Backup Manager: Lucene directory backup already exists!! {0} -> We're going to delete that now", backup);
                     try
                     {
-                        Directory.Delete(dir, true);
+                        DeleteDirectory(dir);
                     }
                     catch (Exception e)
                     {
@@ -71,6 +74,11 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
         public bool RestoreDirectoryBackup(string dir)
         {
             string backup = dir + ".backup";
+            if (!Directory.Exists(backup))
+            {
+                _logger.WarnFormat("Backup Manager: Lucene backup directory does not exist, while restore was requested!! {0}", dir);
+                return false;
+            }
             if (Directory.Exists(dir))
             {
                 _logger.WarnFormat("Backup Manager: Lucene directory already exists!! {0} -> We're going to delete that now", dir);
@@ -116,7 +124,7 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 
             // Get the files in the directory and copy them to the new location.
             FileInfo[] files = dir.GetFiles();
-            foreach (FileInfo file in files)
+            foreach (FileInfo file in files.Where(fi => !".lock".Equals(fi.Extension, StringComparison.InvariantCultureIgnoreCase)))
             {
                 string temppath = Path.Combine(destDirName, file.Name);
                 file.CopyTo(temppath, false);
@@ -131,6 +139,11 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
                     CopyDirectory(subdir.FullName, temppath, copySubDirs);
                 }
             }
+        }
+
+        public string GetDirectoryName(Index index)
+        {
+            return index.Directory.GetPath().Split(new[] {index.Name}, StringSplitOptions.None)[0] + index.Name;
         }
     }
 }
