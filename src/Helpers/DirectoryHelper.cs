@@ -81,7 +81,7 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
             }
             if (Directory.Exists(dir))
             {
-                _logger.WarnFormat("Backup Manager: Lucene directory already exists!! {0} -> We're going to delete that now", dir);
+                _logger.WarnFormat("Backup Manager: Restore -> Lucene directory exists! {0} -> We're going to delete that now", dir);
 
                 try
                 {
@@ -89,17 +89,29 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
                 }
                 catch (Exception e)
                 {
-                    _logger.InfoFormat("Backup Manager: Could not delete directory: {0}. Exception: {1}", dir, e);
-                    return false;
-                }
-
-                if (Directory.Exists(dir))
-                {
-                    _logger.InfoFormat("Backup Manager: Could not delete directory: {0}", dir);
-                    return false;
+                    _logger.InfoFormat("Backup Manager: Could not delete directory: {0}. Exception: {1}. Trying file by file now", dir, e);
+                    try
+                    {
+                        var files = new DirectoryInfo(dir).GetFiles();
+                        foreach (
+                            var file in
+                                files.Where(
+                                    fi => !".lock".Equals(fi.Extension, StringComparison.InvariantCultureIgnoreCase)))
+                        {
+                            file.Delete();
+                        }
+                    }
+                    catch (Exception e1)
+                    {
+                        _logger.InfoFormat("Backup Manager: File by file also failed :( . Could not delete directory: {0}. Exception: {1}. Trying file by file now", dir, e1);
+                        return false;
+                    }
                 }
             }
-            Directory.CreateDirectory(dir);
+            if (!Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
             CopyDirectory(backup, dir, true);
             _logger.InfoFormat("Backup Manager: Backup restored for: {0}", dir);
             return true;

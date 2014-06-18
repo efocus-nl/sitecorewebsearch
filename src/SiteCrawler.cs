@@ -555,12 +555,14 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     else
                     {
                         if (_logger != null)
-                            _logger.WarnFormat("Crawler encountered status {0} ({1}) for document {2}, ABORTING CRAWLER DUE TO ERROR ON FIRST REQUEST",
+                            _logger.WarnFormat("Crawler encountered status {0} ({1}) for document {2}",
                                                propertyBag.StatusCode.ToString(), propertyBag.StatusDescription, id);
                         //Raise an event that the document request returned an error
                         Event.RaiseEvent("SiteCrawler:DocumentError", new CrawlDocumentErrorEventArgs(updateCrawler, id, propertyBag));
                         if (propertyBag.Step.Depth == 0)
                         {
+                            if (_logger != null)
+                                _logger.Warn("ABORTING CRAWLER DUE TO ERROR ON FIRST REQUEST");
                             crawler.Cancel();
                         }
                     }
