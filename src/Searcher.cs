@@ -38,7 +38,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             return Query(GetFullTextQuery(query), out totalResults, rootItem, start, count, sort, templateId);
         }
 
-        public BooleanQuery GetFullTextQuery(string query, float minimumSimilarity = 0.5f, float boostTitle = 1.5f)
+        public BooleanQuery GetFullTextQuery(string query, float minimumSimilarity = 0.5f, float boostTitle = 1.5f, string[] stopwords = null)
         {
             query = QueryParser.Escape(query);
             var textQueries = new BooleanQuery();
@@ -47,7 +47,8 @@ namespace Efocus.Sitecore.LuceneWebSearch
             if (hasMoreWords)
             {
                 var parts = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var part in parts)
+
+                foreach (var part in parts.Where(part => stopwords == null || !stopwords.Contains(part.ToLowerInvariant())))
                 {
                     textQueries.Add(GetFullTextQueryOnWord(part, 0, 0.7f, boostTitle), Occur.SHOULD);
                 }
