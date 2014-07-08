@@ -39,44 +39,13 @@ using Index = Sitecore.Search.Index;
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
-    public static class CustomFields
-    {
-        public const string Depth = "_crawldepth";
-        public const string UpdateContextId = "_updatecontextid";
-        public const string Description = "_description";
-    }
-
-    public class HashtagIndependentInMemoryCrawlerHistoryService : InMemoryCrawlerHistoryService
-    {
-        protected override void Add(string key)
-        {
-            key = RemoveHash(key);
-            base.Add(key);
-        }
-
-        private string RemoveHash(string key)
-        {
-            if (!String.IsNullOrEmpty(key) && key.Contains("#"))
-            {
-                return key.Substring(0, key.IndexOf('#'));
-            }
-            return key;
-        }
-
-        protected override bool Exists(string key)
-        {
-            key = RemoveHash(key);
-            return base.Exists(key);
-        }
-        public override bool Register(string key)
-        {
-            key = RemoveHash(key);
-            return base.Register(key);
-        }
-    }
-
     public class SiteCrawler : BaseCrawler, ICrawler, IPipelineStep
     {
+        static SiteCrawler()
+        {
+            CustomNCrawlerModule.SetupCustomCrawlerModule();
+        }
+
         //private IUrlProvider _urlProvider;
         private ILogger _logger;
         private Index _index;
@@ -182,17 +151,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
             RegexExcludeFilter = @"(\.jpg|\.css|\.js|\.gif|\.jpeg|\.png|\.ico)";
             UriSensitivity = UriComponents.UserInfo;
             _historyService = new HashtagIndependentInMemoryCrawlerHistoryService();
-            NCrawlerModule.Register(builder =>
-                {
-                    builder.Register((c, p) =>
-                        {
-                            NCrawlerModule.Setup(); // Return to standard setup
-                            return _historyService;
-                        }).As<ICrawlerHistory>().InstancePerDependency();
-
-                    builder.Register(c => CreateLoggerBridge()).As<ILog>().InstancePerDependency();
-                }
-            );
             _directoryHelper = IoC.Resolver.Resolve<DirectoryHelper>();
         }
 
@@ -223,11 +181,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
         private void HandleUpdateIndexEvent(object sender, EventArgs eventArgs)
         {
             UpdateIndex();
-        }
-
-        private ILog CreateLoggerBridge()
-        {
-            return new LogLoggerBridge(_logger ?? CreateLogger());
         }
 
         protected virtual ILogger CreateLogger()

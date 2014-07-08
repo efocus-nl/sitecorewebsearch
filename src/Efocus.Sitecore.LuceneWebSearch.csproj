@@ -75,9 +75,11 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="CustomDownloaderModule.cs" />
+    <Compile Include="CustomFields.cs" />
     <Compile Include="CustomWebDownloader.cs" />
     <Compile Include="Enums\IndexAction.cs" />
     <Compile Include="FixedSearchContext.cs" />
+    <Compile Include="HashtagIndependentInMemoryCrawlerHistoryService.cs" />
     <Compile Include="Helpers\DirectoryHelper.cs" />
     <Compile Include="HtmlDocumentProcessor.cs" />
     <Compile Include="Init\InitContainer.cs" />
