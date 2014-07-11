@@ -93,7 +93,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
         private bool _updateIndexRunning = false;
         private object _updateIndexRunningLock = new object();
 
-#region configurable settings
+        #region configurable settings
         public bool AdhereToRobotRules { get; set; }
         public bool UseCookies { get; set; }
         public int MaximumThreadCount { get; set; }
@@ -172,8 +172,8 @@ namespace Efocus.Sitecore.LuceneWebSearch
         {
             get { return _rebuildTriggers; }
         }
-#endregion
-        
+        #endregion
+
         public SiteCrawler()
         {
             AdhereToRobotRules = true;
@@ -181,18 +181,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
             MaximumThreadCount = 2;
             RegexExcludeFilter = @"(\.jpg|\.css|\.js|\.gif|\.jpeg|\.png|\.ico)";
             UriSensitivity = UriComponents.UserInfo;
-            _historyService = new HashtagIndependentInMemoryCrawlerHistoryService();
-            NCrawlerModule.Register(builder =>
-                {
-                    builder.Register((c, p) =>
-                        {
-                            NCrawlerModule.Setup(); // Return to standard setup
-                            return _historyService;
-                        }).As<ICrawlerHistory>().InstancePerDependency();
-
-                    builder.Register(c => CreateLoggerBridge()).As<ILog>().InstancePerDependency();
-                }
-            );
             _directoryHelper = IoC.Resolver.Resolve<DirectoryHelper>();
         }
 
@@ -381,7 +369,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     }
                 }
 
-                catch(Exception crawlException)
+                catch (Exception crawlException)
                 {
                     if (_logger != null) _logger.Error(GetExceptionLog(crawlException).ToString());
                     if (_directoryHelper.RestoreDirectoryBackup(dir))
@@ -492,7 +480,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             if (_logger != null) _logger.InfoFormat("Crawler rebuild called, going to crawl {0} urls", _urls.Count);
             Crawl(context);
         }
-        
+
         //IPipelineStep.Process
         public void Process(Crawler crawler, PropertyBag propertyBag)
         {
@@ -700,7 +688,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
                                 //efcrawler:extrafield:templateid: value
                                 var extraField = metaTag.Substring("efcrawler:extrafield:".Length);
                                 extraField = extraField.Substring(0, extraField.IndexOf(':'));
-                                var fulllength = "efcrawler:extrafield:".Length + extraField.Length + 2; 
+                                var fulllength = "efcrawler:extrafield:".Length + extraField.Length + 2;
                                 string description = ValueOrEmpty(metaTag.Substring(fulllength));
 
                                 document.Add(CreateTextField(extraField, description));
@@ -811,7 +799,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             if (item != null)
             {
                 string displayName = item.Appearance.DisplayName;
-                Assert.IsNotNull((object) displayName, "Item's display name is null.");
+                Assert.IsNotNull((object)displayName, "Item's display name is null.");
                 document.Add(this.CreateTextField(BuiltinFields.Name, item.Name));
                 document.Add(this.CreateTextField(BuiltinFields.Name, displayName));
                 document.Add(this.CreateValueField(BuiltinFields.Icon, item.Appearance.Icon));
@@ -873,7 +861,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             Assert.ArgumentNotNull((object)item, "item");
             return new Regex("[{}-]", RegexOptions.Compiled).Replace(item.Paths.LongID.Replace('/', ' '), string.Empty);
         }
-        
+
         #region Helpers
         readonly System.Reflection.FieldInfo _writerField = typeof(IndexUpdateContext).GetField("_writer", BindingFlags.Instance | BindingFlags.GetField | BindingFlags.NonPublic);
         private readonly HashtagIndependentInMemoryCrawlerHistoryService _historyService;

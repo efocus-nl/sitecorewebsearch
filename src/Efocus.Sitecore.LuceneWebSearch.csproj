@@ -49,8 +49,15 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Autofac">
+      <HintPath>..\..\..\..\Libs\NCrawler\Autofac.dll</HintPath>
+    </Reference>
     <Reference Include="BoC">
       <HintPath>$(ModulesLibraryDir)\BoC\BoC.dll</HintPath>
+    </Reference>
+    <Reference Include="HtmlAgilityPack, Version=1.4.6.0, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\Libs\NCrawler\HtmlAgilityPack.dll</HintPath>
     </Reference>
     <Reference Include="Lucene.Net, Version=3.0.3.0, Culture=neutral, PublicKeyToken=85089178b9ac3181, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -59,6 +66,9 @@
     <Reference Include="NCrawler, Version=3.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>$(ModulesLibraryDir)\NCrawler\NCrawler.dll</HintPath>
+    </Reference>
+    <Reference Include="NCrawler.HtmlProcessor">
+      <HintPath>..\..\..\..\Libs\NCrawler\NCrawler.HtmlProcessor.dll</HintPath>
     </Reference>
     <Reference Include="Sitecore.Kernel, Version=6.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
