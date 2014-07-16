@@ -39,44 +39,13 @@ using Index = Sitecore.Search.Index;
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
-    public static class CustomFields
-    {
-        public const string Depth = "_crawldepth";
-        public const string UpdateContextId = "_updatecontextid";
-        public const string Description = "_description";
-    }
-
-    public class HashtagIndependentInMemoryCrawlerHistoryService : InMemoryCrawlerHistoryService
-    {
-        protected override void Add(string key)
-        {
-            key = RemoveHash(key);
-            base.Add(key);
-        }
-
-        private string RemoveHash(string key)
-        {
-            if (!String.IsNullOrEmpty(key) && key.Contains("#"))
-            {
-                return key.Substring(0, key.IndexOf('#'));
-            }
-            return key;
-        }
-
-        protected override bool Exists(string key)
-        {
-            key = RemoveHash(key);
-            return base.Exists(key);
-        }
-        public override bool Register(string key)
-        {
-            key = RemoveHash(key);
-            return base.Register(key);
-        }
-    }
-
     public class SiteCrawler : BaseCrawler, ICrawler, IPipelineStep
     {
+        static SiteCrawler()
+    {
+            CustomNCrawlerModule.SetupCustomCrawlerModule();
+        }
+
         //private IUrlProvider _urlProvider;
         private ILogger _logger;
         private Index _index;
@@ -87,6 +56,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
         private readonly Dictionary<IEnumerable<char>, IEnumerable<char>> _followFilters = new Dictionary<IEnumerable<char>, IEnumerable<char>>();
         private readonly Object _runninglock = new Object();
         private Dictionary<string, string> _globalVariables;
+        private bool _cancelled;
 
         private bool _isrunning = false;
         private bool _updateIndexRunning = false;
@@ -181,18 +151,8 @@ namespace Efocus.Sitecore.LuceneWebSearch
             RegexExcludeFilter = @"(\.jpg|\.css|\.js|\.gif|\.jpeg|\.png|\.ico)";
             UriSensitivity = UriComponents.UserInfo;
             _historyService = new HashtagIndependentInMemoryCrawlerHistoryService();
-            NCrawlerModule.Register(builder =>
-                {
-                    builder.Register((c, p) =>
-                        {
-                            NCrawlerModule.Setup(); // Return to standard setup
-                            return _historyService;
-                        }).As<ICrawlerHistory>().InstancePerDependency();
-
-                    builder.Register(c => CreateLoggerBridge()).As<ILog>().InstancePerDependency();
+            _directoryHelper = IoC.Resolver.Resolve<DirectoryHelper>();
                 }
-            );
-        }
 
         public void Initialize(Index index)
         {
@@ -221,11 +181,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
         private void HandleUpdateIndexEvent(object sender, EventArgs eventArgs)
         {
             UpdateIndex();
-        }
-
-        private ILog CreateLoggerBridge()
-        {
-            return new LogLoggerBridge(_logger ?? CreateLogger());
         }
 
         protected virtual ILogger CreateLogger()
@@ -274,18 +229,12 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 return;
             lock (_updateIndexRunningLock)
             {
+                try
+                {
                 if (_updateIndexRunning)
                     return;
                 _updateIndexRunning = true;
 
-                var dir = _index.Directory.GetPath().Split(new[] { _index.Name }, StringSplitOptions.None)[0] + _index.Name;
-
-                DirectoryHelper directoryHelper = IoC.Resolver.Resolve<DirectoryHelper>();
-                bool errorOccured = false;
-
-                try
-                {
-                    directoryHelper.CreateDirectoryBackup(dir);
                     using (var updateContext = _index.CreateUpdateContext())
                     {
                         Crawl(updateContext);
@@ -301,24 +250,25 @@ namespace Efocus.Sitecore.LuceneWebSearch
 						_logger.Info(string.Format("Search index {0} committed", _index.Name));
                     }
                 }
-                catch (Exception crawlExeption)
+                catch (Exception exc)
                 {
-                    errorOccured = true;
-                    _logger.Error(GetExceptionLog(crawlExeption).ToString());
-                    //TODO: should we only restore backup in some exception cases?
-                    if (directoryHelper.RestoreDirectoryBackup(dir)) errorOccured = false; //if true you can delete the backup in the finally
+                    if (_logger != null) _logger.Error(GetExceptionLog(exc).ToString());
                 }
                 finally
                 {
                     _updateIndexRunning = false;
-                    if(!errorOccured)
-                        directoryHelper.DeleteBackupDirectory(dir);
                 }
             }
         }
 
         private void Crawl(IndexUpdateContext context)
         {
+            if (_isrunning)
+            {
+                _logger.InfoFormat("Crawler is already running, aborting");
+                return;
+            }
+
             lock (_runninglock)
             {
                 if (_isrunning)
@@ -327,9 +277,13 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     return;
                 }
                 _isrunning = true;
-            }
+
+                var dir = _directoryHelper.GetDirectoryName(_index);
+
+                _cancelled = false;
             try
             {
+                    _directoryHelper.CreateDirectoryBackup(dir);
                 GetIndexWriter(context).DeleteDocuments(new Term(BuiltinFields.Tags, ValueOrEmpty(Tags)));
 
                 var runningContextId = ShortID.NewId();
@@ -337,11 +291,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 foreach (var url in urls)
                 {
                     if (_logger != null) _logger.InfoFormat("Starting url: {0}", url);
-                    var documentProcessor = (_logger != null && _logger.IsDebugEnabled) ? new LogHtmlDocumentProcessor(_logger, _indexFilters, _followFilters) : new HtmlDocumentProcessor(_indexFilters, _followFilters);
+                        var documentProcessor = (_logger != null && _logger.IsDebugEnabled)
+                            ? new LogHtmlDocumentProcessor(_logger, _indexFilters, _followFilters)
+                            : new HtmlDocumentProcessor(_indexFilters, _followFilters);
 
-                    using (var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url), new LogLoggerBridge(_logger), documentProcessor, this))
+                        using (
+                            var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url),
+                                new LogLoggerBridge(_logger), documentProcessor, this))
                     {
-                        if (_logger != null) _logger.Info(String.Format("Crawler started: Using {0} threads", MaximumThreadCount));
+                            if (_logger != null)
+                                _logger.Info(String.Format("Crawler started: Using {0} threads", MaximumThreadCount));
                         c.AdhereToRobotRules = AdhereToRobotRules;
                         c.MaximumThreadCount = MaximumThreadCount;
                         c.UriSensitivity = UriSensitivity;
@@ -364,6 +323,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
                         c.AfterDownload += CrawlerAfterDownload;
                         c.PipelineException += CrawlerPipelineException;
                         c.DownloadException += CrawlerDownloadException;
+                            c.Cancelled += CrawlerCancelled;
 
                         Event.RaiseEvent("SiteCrawler:Started", new CrawlStartedEventArgs(c));
 
@@ -373,17 +333,33 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     }
                 }
             }
-            catch (Exception crawlException)
+
+                catch(Exception crawlException)
             {
                 if (_logger != null) _logger.Error(GetExceptionLog(crawlException).ToString());
+                    if (_directoryHelper.RestoreDirectoryBackup(dir))
+                    {
+                        _cancelled = false;
+                    }
             }
             finally
             {
                 if (_logger != null) _logger.Info("Crawler finished");
-                lock (_runninglock)
-                {
                     _isrunning = false;
+                    if (!_cancelled)
+                        _directoryHelper.DeleteBackupDirectory(dir);
                 }
+            }
+                }
+
+        private void CrawlerCancelled(object sender, EventArgs eventArgs)
+        {
+            this._cancelled = true;
+            if (_logger != null) _logger.Info("Crawler cancelled, removing backupdir");
+            var dir = _directoryHelper.GetDirectoryName(_index);
+            if (_directoryHelper.RestoreDirectoryBackup(dir))
+            {
+                _directoryHelper.DeleteBackupDirectory(dir);
             }
         }
 
@@ -510,8 +486,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
                         updateCrawler.UpdateContext.AddDocument(document);
 
                         //Raise event that the givven document is updated
-                        Event.RaiseEvent("SiteCrawler:DocumentUpdated",
-                                         new CrawlDocumentUpdatedEventArgs(updateCrawler, document));
+                        Event.RaiseEvent("SiteCrawler:DocumentUpdated", new CrawlDocumentUpdatedEventArgs(updateCrawler, document));
 
                         if (_logger != null) _logger.InfoFormat("{0}| Add/Update | {1}", depthString, id);
                     }
@@ -522,14 +497,27 @@ namespace Efocus.Sitecore.LuceneWebSearch
                         Event.RaiseEvent("SiteCrawler:DocumentNotFound",
                                          new CrawlDocumentErrorEventArgs(updateCrawler, id, propertyBag));
                     }
+                    else if (propertyBag.StatusCode == HttpStatusCode.ServiceUnavailable)
+                    {
+                        _logger.WarnFormat("Crawler encountered status {0} ({1}) for document {2}, ABORTING CRAWLER!!",
+                                           propertyBag.StatusCode.ToString(), propertyBag.StatusDescription, id);
+                        Event.RaiseEvent("SiteCrawler:DocumentError", new CrawlDocumentErrorEventArgs(updateCrawler, id, propertyBag));
+                        //server is shutting down or is too busy, abort the indexing!!
+                        crawler.Cancel();
+                    }
                     else
                     {
                         if (_logger != null)
                             _logger.WarnFormat("Crawler encountered status {0} ({1}) for document {2}",
                                                propertyBag.StatusCode.ToString(), propertyBag.StatusDescription, id);
                         //Raise an event that the document request returned an error
-                        Event.RaiseEvent("SiteCrawler:DocumentError",
-                                         new CrawlDocumentErrorEventArgs(updateCrawler, id, propertyBag));
+                        Event.RaiseEvent("SiteCrawler:DocumentError", new CrawlDocumentErrorEventArgs(updateCrawler, id, propertyBag));
+                        if (propertyBag.Step.Depth == 0)
+                        {
+                            if (_logger != null)
+                                _logger.Warn("ABORTING CRAWLER DUE TO ERROR ON FIRST REQUEST");
+                            crawler.Cancel();
+                        }
                     }
                 }
             }
@@ -659,6 +647,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
                                 document.Add(CreateTextField(BuiltinFields.Content, description));
                                 document.Add(CreateTextField(CustomFields.Description, description));
                                 document.Add(CreateDataField(CustomFields.Description, description));
+                            }
+                            else if (metaTag.StartsWith("efcrawler:extrafield:", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                //efcrawler:extrafield:templateid: value
+                                var extraField = metaTag.Substring("efcrawler:extrafield:".Length);
+                                extraField = extraField.Substring(0, extraField.IndexOf(':'));
+                                var fulllength = "efcrawler:extrafield:".Length + extraField.Length + 2; 
+                                string description = ValueOrEmpty(metaTag.Substring(fulllength));
+
+                                document.Add(CreateTextField(extraField, description));
                             }
                         }
                     }
@@ -831,7 +829,8 @@ namespace Efocus.Sitecore.LuceneWebSearch
         
         #region Helpers
         readonly System.Reflection.FieldInfo _writerField = typeof(IndexUpdateContext).GetField("_writer", BindingFlags.Instance | BindingFlags.GetField | BindingFlags.NonPublic);
-        private HashtagIndependentInMemoryCrawlerHistoryService _historyService;
+        private readonly HashtagIndependentInMemoryCrawlerHistoryService _historyService;
+        private readonly DirectoryHelper _directoryHelper;
 
         public IndexWriter GetIndexWriter(IndexUpdateContext updateContext)
         {
@@ -853,27 +852,8 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 }
                 return _globalVariables;
             }
-        }
-
-        private static CookieContainer GetAuthorizationCookie(Uri loginPage, NameValueCollection postData)
-        {
-            CookieContainer cookies;
-
-            using (var client = new CookiesAwareWebClient())
-            {
-                client.IgnoreRedirects = false;
-                //Load Page via get request to initialize cookies...
-                client.DownloadData(loginPage);
-                //Add cookies to the outbound request.
-                client.OutboundCookies.Add(client.InboundCookies);
-                client.UploadValues(loginPage, "POST", postData);
-                //Add latest cookies (includes the authorization to the cookie collection)
-                client.OutboundCookies.Add(client.InboundCookies);
-                cookies = client.OutboundCookies;
             }
 
-            return cookies;
-        }
         #endregion
     }
 }

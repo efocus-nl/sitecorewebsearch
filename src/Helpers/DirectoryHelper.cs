@@ -1,6 +1,9 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using BoC.Logging;
+using Sitecore.Extensions;
+using Sitecore.Search;
 
 namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 {
@@ -19,7 +22,7 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 
             try
             {
-            Directory.Delete(dir, true);
+                Directory.Delete(dir, true);
             }
             catch (Exception e)
             {
@@ -54,8 +57,8 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
                     _logger.WarnFormat("Backup Manager: Lucene directory backup already exists!! {0} -> We're going to delete that now", backup);
                     try
                     {
-                        Directory.Delete(dir, true);
-                }
+                        DeleteDirectory(dir);
+                    }
                     catch (Exception e)
                     {
                         //TODO: What should we do now that the backup dir is corrupted?
@@ -71,27 +74,44 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
         public bool RestoreDirectoryBackup(string dir)
         {
             string backup = dir + ".backup";
+            if (!Directory.Exists(backup))
+            {
+                _logger.WarnFormat("Backup Manager: Lucene backup directory does not exist, while restore was requested!! {0}", dir);
+                return false;
+            }
             if (Directory.Exists(dir))
             {
-                _logger.WarnFormat("Backup Manager: Lucene directory already exists!! {0} -> We're going to delete that now", dir);
+                _logger.WarnFormat("Backup Manager: Restore -> Lucene directory exists! {0} -> We're going to delete that now", dir);
 
                 try
                 {
-                Directory.Delete(dir, true);
+                    Directory.Delete(dir, true);
                 }
                 catch (Exception e)
                 {
-                    _logger.InfoFormat("Backup Manager: Could not delete directory: {0}. Exception: {1}", dir, e);
-                    return false;
+                    _logger.InfoFormat("Backup Manager: Could not delete directory: {0}. Exception: {1}. Trying file by file now", dir, e);
+                    try
+                    {
+                        var files = new DirectoryInfo(dir).GetFiles();
+                        foreach (
+                            var file in
+                                files.Where(
+                                    fi => !".lock".Equals(fi.Extension, StringComparison.InvariantCultureIgnoreCase)))
+                        {
+                            file.Delete();
                 }
-
-                if (Directory.Exists(dir))
+                    }
+                    catch (Exception e1)
                 {
-                    _logger.InfoFormat("Backup Manager: Could not delete directory: {0}", dir);
+                        _logger.InfoFormat("Backup Manager: File by file also failed :( . Could not delete directory: {0}. Exception: {1}. Trying file by file now", dir, e1);
                     return false;
                 }
             }
+            }
+            if (!Directory.Exists(dir))
+            {
             Directory.CreateDirectory(dir);
+            }
             CopyDirectory(backup, dir, true);
             _logger.InfoFormat("Backup Manager: Backup restored for: {0}", dir);
             return true;
@@ -116,7 +136,7 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 
             // Get the files in the directory and copy them to the new location.
             FileInfo[] files = dir.GetFiles();
-            foreach (FileInfo file in files)
+            foreach (FileInfo file in files.Where(fi => !".lock".Equals(fi.Extension, StringComparison.InvariantCultureIgnoreCase)))
             {
                 string temppath = Path.Combine(destDirName, file.Name);
                 file.CopyTo(temppath, false);
@@ -131,6 +151,11 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
                     CopyDirectory(subdir.FullName, temppath, copySubDirs);
                 }
             }
+        }
+
+        public string GetDirectoryName(Index index)
+        {
+            return index.Directory.GetPath().Split(new[] {index.Name}, StringSplitOptions.None)[0] + index.Name;
         }
     }
 }
