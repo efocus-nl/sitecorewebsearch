@@ -38,16 +38,16 @@ namespace Efocus.Sitecore.LuceneWebSearch
             return Query(GetFullTextQuery(query), out totalResults, rootItem, start, count, sort, templateId);
         }
 
-        public BooleanQuery GetFullTextQuery(string query, float minimumSimilarity = 0.5f, float boostTitle = 1.5f)
+        public BooleanQuery GetFullTextQuery(string query, float minimumSimilarity = 0.5f, float boostTitle = 1.5f, string[] stopwords = null)
         {
-            query = QueryParser.Escape(query);
             var textQueries = new BooleanQuery();
             var hasMoreWords = query.Contains(" ");
             textQueries.Add(GetFullTextQueryOnWord(query, hasMoreWords ? 0.7f : 0, minimumSimilarity), Occur.SHOULD);
             if (hasMoreWords)
             {
                 var parts = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var part in parts)
+
+                foreach (var part in parts.Where(part => stopwords == null || !stopwords.Contains(part.ToLowerInvariant())))
                 {
                     textQueries.Add(GetFullTextQueryOnWord(part, 0, 0.7f, boostTitle), Occur.SHOULD);
                 }
@@ -55,24 +55,23 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
             return textQueries;
         }
-        
+            
         protected virtual BooleanQuery GetFullTextQueryOnWord(string query, float extraBoost, float minimumSimilarity, float boostTitle = 1.5f)
         {
-            query = QueryParser.Escape(query);
             var boolq = new BooleanQuery();
-            
-            var contentTerm = new Term(BuiltinFields.Content, query.ToLower());
+
+            var contentTerm = new Term(BuiltinFields.Content, QueryParser.Escape(query).ToLower());
             var qbody = minimumSimilarity < 1 ? (Query) new FuzzyQuery(contentTerm, minimumSimilarity) : new TermQuery(contentTerm);
             qbody.Boost = 1.0f + extraBoost;
 
             boolq.Add(qbody, Occur.SHOULD);
 
-            var nameTerm = new Term(BuiltinFields.Name, query.ToLower());
+            var nameTerm = new Term(BuiltinFields.Name, QueryParser.Escape(query).ToLower());
             var qtitle = minimumSimilarity < 1 ? (Query) new FuzzyQuery(nameTerm, minimumSimilarity) : new TermQuery(nameTerm);
             qtitle.Boost = boostTitle + extraBoost;
             boolq.Add(qtitle, Occur.SHOULD);
 
-            var descriptionTerm = new Term(CustomFields.Description, query.ToLower());
+            var descriptionTerm = new Term(CustomFields.Description, QueryParser.Escape(query).ToLower());
             var qdescription =  minimumSimilarity < 1 ? (Query) new FuzzyQuery(descriptionTerm, minimumSimilarity) : new TermQuery(descriptionTerm);
             qdescription.Boost = 1.1f + extraBoost;
             boolq.Add(qdescription, Occur.SHOULD);
