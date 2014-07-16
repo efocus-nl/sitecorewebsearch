@@ -8,7 +8,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
     {
         private readonly CookieContainer _cookieContainer;
 
-        public CustomWebDownloader(CookieContainer cookieContainer)
+        public CustomWebDownloader(CookieContainer cookieContainer = null)
         {
             _cookieContainer = cookieContainer;
         }
@@ -16,7 +16,10 @@ namespace Efocus.Sitecore.LuceneWebSearch
         protected override void SetDefaultRequestProperties(HttpWebRequest request)
         {
             base.SetDefaultRequestProperties(request);
+            if (_cookieContainer != null)
+            {
             request.CookieContainer = _cookieContainer;
         }
     }
+}
 }
