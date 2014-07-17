@@ -20,6 +20,7 @@ using Lucene.Net.Documents;
 using Lucene.Net.Index;
 using NCrawler;
 using NCrawler.Events;
+using NCrawler.Extensions;
 using NCrawler.HtmlProcessor;
 using NCrawler.Interfaces;
 using NCrawler.Services;
@@ -287,50 +288,49 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     GetIndexWriter(context).DeleteDocuments(new Term(BuiltinFields.Tags, ValueOrEmpty(Tags)));
 
                     var runningContextId = ShortID.NewId();
-                    var urls = GetTransformedUrls();
-                    foreach (var url in urls)
+                    var urls = GetTransformedUrls().ToList();
+                    if (_logger != null)
                     {
-                        if (_logger != null) _logger.InfoFormat("Starting url: {0}", url);
-                        var documentProcessor = (_logger != null && _logger.IsDebugEnabled)
-                            ? new LogHtmlDocumentProcessor(_logger, _indexFilters, _followFilters)
-                            : new HtmlDocumentProcessor(_indexFilters, _followFilters);
+                        urls.ForEach( url => _logger.InfoFormat("Starting url: {0}", url));
+                    }
 
-                        using (
-                            var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url),
-                                new LogLoggerBridge(_logger), documentProcessor, this))
+                    var documentProcessor = (_logger != null && _logger.IsDebugEnabled)
+                        ? new LogHtmlDocumentProcessor(_logger, _indexFilters, _followFilters)
+                        : new HtmlDocumentProcessor(_indexFilters, _followFilters);
+
+                    using ( var c = new UpdateContextAwareCrawler(context, runningContextId, urls, new LogLoggerBridge(_logger), documentProcessor, this))
+                    {
+                        if (_logger != null)
+                            _logger.Info(String.Format("Crawler started: Using {0} threads", MaximumThreadCount));
+                        c.AdhereToRobotRules = AdhereToRobotRules;
+                        c.MaximumThreadCount = MaximumThreadCount;
+                        c.UriSensitivity = UriSensitivity;
+
+                        if (MaximumCrawlDepth > 0)
+                            c.MaximumCrawlDepth = MaximumCrawlDepth;
+
+                        if (MaximumDocuments > 0)
+                            c.MaximumCrawlCount = MaximumDocuments;
+
+                        if (MaximumCrawlTime.TotalMinutes > 0)
+                            c.MaximumCrawlTime = MaximumCrawlTime;
+
+                        c.UseCookies = UseCookies;
+                        c.ExcludeFilter = new[]
                         {
-                            if (_logger != null)
-                                _logger.Info(String.Format("Crawler started: Using {0} threads", MaximumThreadCount));
-                            c.AdhereToRobotRules = AdhereToRobotRules;
-                            c.MaximumThreadCount = MaximumThreadCount;
-                            c.UriSensitivity = UriSensitivity;
+                            new RegexFilter(new Regex(RegexExcludeFilter))
+                        };
 
-                            if (MaximumCrawlDepth > 0)
-                                c.MaximumCrawlDepth = MaximumCrawlDepth;
+                        c.AfterDownload += CrawlerAfterDownload;
+                        c.PipelineException += CrawlerPipelineException;
+                        c.DownloadException += CrawlerDownloadException;
+                        c.Cancelled += CrawlerCancelled;
 
-                            if (MaximumDocuments > 0)
-                                c.MaximumCrawlCount = MaximumDocuments;
+                        Event.RaiseEvent("SiteCrawler:Started", new CrawlStartedEventArgs(c));
 
-                            if (MaximumCrawlTime.TotalMinutes > 0)
-                                c.MaximumCrawlTime = MaximumCrawlTime;
+                        c.Crawl();
 
-                            c.UseCookies = UseCookies;
-                            c.ExcludeFilter = new[]
-                            {
-                                new RegexFilter(new Regex(RegexExcludeFilter))
-                            };
-
-                            c.AfterDownload += CrawlerAfterDownload;
-                            c.PipelineException += CrawlerPipelineException;
-                            c.DownloadException += CrawlerDownloadException;
-                            c.Cancelled += CrawlerCancelled;
-
-                            Event.RaiseEvent("SiteCrawler:Started", new CrawlStartedEventArgs(c));
-
-                            c.Crawl();
-
-                            Event.RaiseEvent("SiteCrawler:Finished", new CrawlFinishedEventArgs(c));
-                        }
+                        Event.RaiseEvent("SiteCrawler:Finished", new CrawlFinishedEventArgs(c));
                     }
                 }
 
@@ -422,7 +422,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             return sb;
         }
 
-        protected IEnumerable<string> GetTransformedUrls()
+        protected IEnumerable<Uri> GetTransformedUrls()
         {
             return _urls.Cast<string>().Select(s =>
                 {
@@ -435,8 +435,12 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     }
                     if (!url.StartsWith("http://") && !url.StartsWith("https://"))
                         url = "http://" + url;
-                    return url;
-                }).Where(s => !string.IsNullOrEmpty(s));
+
+                    if (Uri.IsWellFormedUriString(url, UriKind.Absolute)) return new Uri(url, UriKind.Absolute);
+                    if (Uri.IsWellFormedUriString(url, UriKind.Relative)) return new Uri(url, UriKind.Relative);
+
+                    return null;
+                }).Where(s => s != null );
         }
 
 

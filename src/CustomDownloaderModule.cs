@@ -21,8 +21,8 @@ namespace Efocus.Sitecore.LuceneWebSearch
             RegistrationExtensions.Register(builder, c => new InMemoryCrawlerQueueService()).As<ICrawlerQueue>().InstancePerDependency();
             RegistrationExtensions.Register(builder, c => new LogLoggerBridge(CreateLogger())).As<ILog>().InstancePerDependency();
             RegistrationExtensions.Register(builder, c => new NativeTaskRunnerService()).As<ITaskRunner>().InstancePerDependency();
-            RegistrationExtensions.Register(builder, (c, p) => new RobotService(ParameterExtensions.TypedAs<Uri>(p), ResolutionExtensions.Resolve<IWebDownloader>(c))).As<IRobot>().InstancePerDependency();
-            RegistrationExtensions.Register(builder, (c, p) => new CrawlerRulesService(ParameterExtensions.TypedAs<Crawler>(p), ResolutionExtensions.Resolve<IRobot>(c, p), ParameterExtensions.TypedAs<Uri>(p))).As<ICrawlerRules>().InstancePerDependency();
+            RegistrationExtensions.Register(builder, (c, p) => new RobotService(ParameterExtensions.TypedAs<IEnumerable<Uri>>(p), ResolutionExtensions.Resolve<IWebDownloader>(c))).As<IRobot>().InstancePerDependency();
+            RegistrationExtensions.Register(builder, (c, p) => new CrawlerRulesService(ParameterExtensions.TypedAs<Crawler>(p), ResolutionExtensions.Resolve<IRobot>(c, p), ParameterExtensions.TypedAs<IEnumerable<Uri>>(p))).As<ICrawlerRules>().InstancePerDependency();
         }
 
         protected virtual ILogger CreateLogger()
