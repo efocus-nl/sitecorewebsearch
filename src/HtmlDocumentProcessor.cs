@@ -150,13 +150,20 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 }
 
                 string decodedLink = ExtendedHtmlUtility.HtmlEntityDecode(link);
-                string normalizedLink = NormalizeLink(baseUrl, decodedLink);
-                if (normalizedLink.IsNullOrEmpty())
+                try
                 {
-                    continue;
+                    string normalizedLink = NormalizeLink(baseUrl, decodedLink);
+                    if (normalizedLink.IsNullOrEmpty())
+                    {
+                        continue;
+                    }
+                    AddStepToCrawler(crawler, propertyBag, normalizedLink, link);
+                }
+                catch (UriFormatException)
+                {
+                    //When the link is not propper formatted the link mist be ignored
                 }
 
-                AddStepToCrawler(crawler, propertyBag, normalizedLink, link);
             }
         }
 

@@ -212,7 +212,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             RebuildIndex(SearchManager.GetIndex(indexName));
         }
 
-        protected virtual void RebuildIndex()
+        public virtual void RebuildIndex()
         {
             RebuildIndex(_index);
         }
@@ -224,7 +224,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             index.Rebuild();
         }
 
-        protected virtual void UpdateIndex()
+        public virtual void UpdateIndex()
         {
             if (_updateIndexRunning)
                 return;
