@@ -20,6 +20,7 @@ using Lucene.Net.Documents;
 using Lucene.Net.Index;
 using NCrawler;
 using NCrawler.Events;
+using NCrawler.Extensions;
 using NCrawler.HtmlProcessor;
 using NCrawler.Interfaces;
 using NCrawler.Services;
@@ -42,7 +43,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
     public class SiteCrawler : BaseCrawler, ICrawler, IPipelineStep
     {
         static SiteCrawler()
-    {
+        {
             CustomNCrawlerModule.SetupCustomCrawlerModule();
         }
 
@@ -151,7 +152,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             UriSensitivity = UriComponents.UserInfo;
             _historyService = new HashtagIndependentInMemoryCrawlerHistoryService();
             _directoryHelper = IoC.Resolver.Resolve<DirectoryHelper>();
-                }
+        }
 
         public void Initialize(Index index)
         {
@@ -210,7 +211,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             RebuildIndex(SearchManager.GetIndex(indexName));
         }
 
-        protected virtual void RebuildIndex()
+        public virtual void RebuildIndex()
         {
             RebuildIndex(_index);
         }
@@ -222,7 +223,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             index.Rebuild();
         }
 
-        protected virtual void UpdateIndex()
+        public virtual void UpdateIndex()
         {
             if (_updateIndexRunning)
                 return;
@@ -230,23 +231,23 @@ namespace Efocus.Sitecore.LuceneWebSearch
             {
                 try
                 {
-                if (_updateIndexRunning)
-                    return;
-                _updateIndexRunning = true;
+                    if (_updateIndexRunning)
+                        return;
+                    _updateIndexRunning = true;
 
                     using (var updateContext = _index.CreateUpdateContext())
                     {
                         Crawl(updateContext);
 
-						_logger.Info(string.Format("Search index {0} crawling done", _index.Name));
+                        _logger.Info(string.Format("Search index {0} crawling done", _index.Name));
 
                         updateContext.Optimize();
 
-						_logger.Info(string.Format("Search index {0} optimized", _index.Name));
+                        _logger.Info(string.Format("Search index {0} optimized", _index.Name));
 
                         updateContext.Commit();
 
-						_logger.Info(string.Format("Search index {0} committed", _index.Name));
+                        _logger.Info(string.Format("Search index {0} committed", _index.Name));
                     }
                 }
                 catch (Exception exc)
@@ -280,76 +281,75 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 var dir = _directoryHelper.GetDirectoryName(_index);
 
                 _cancelled = false;
-            try
-            {
-                    _directoryHelper.CreateDirectoryBackup(dir);
-                GetIndexWriter(context).DeleteDocuments(new Term(BuiltinFields.Tags, ValueOrEmpty(Tags)));
-
-                var runningContextId = ShortID.NewId();
-                var urls = GetTransformedUrls();
-                foreach (var url in urls)
+                try
                 {
-                    if (_logger != null) _logger.InfoFormat("Starting url: {0}", url);
+                    _directoryHelper.CreateDirectoryBackup(dir);
+                    GetIndexWriter(context).DeleteDocuments(new Term(BuiltinFields.Tags, ValueOrEmpty(Tags)));
+
+                    var runningContextId = ShortID.NewId();
+                    var urls = GetTransformedUrls().ToList();
+                    if (_logger != null)
+                    {
+                        urls.ForEach( url => _logger.InfoFormat("Starting url: {0}", url));
+                    }
+
                         var documentProcessor = (_logger != null && _logger.IsDebugEnabled)
                             ? new LogHtmlDocumentProcessor(_logger, _indexFilters, _followFilters)
                             : new HtmlDocumentProcessor(_indexFilters, _followFilters);
 
-                        using (
-                            var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url),
-                                new LogLoggerBridge(_logger), documentProcessor, this))
-                    {
+                    using ( var c = new UpdateContextAwareCrawler(context, runningContextId, urls, new LogLoggerBridge(_logger), documentProcessor, this))
+                        {
                             if (_logger != null)
                                 _logger.Info(String.Format("Crawler started: Using {0} threads", MaximumThreadCount));
-                        c.AdhereToRobotRules = AdhereToRobotRules;
-                        c.MaximumThreadCount = MaximumThreadCount;
-                        c.UriSensitivity = UriSensitivity;
+                            c.AdhereToRobotRules = AdhereToRobotRules;
+                            c.MaximumThreadCount = MaximumThreadCount;
+                            c.UriSensitivity = UriSensitivity;
 
-                        if (MaximumCrawlDepth > 0)
-                            c.MaximumCrawlDepth = MaximumCrawlDepth;
+                            if (MaximumCrawlDepth > 0)
+                                c.MaximumCrawlDepth = MaximumCrawlDepth;
 
-                        if (MaximumDocuments > 0)
-                            c.MaximumCrawlCount = MaximumDocuments;
+                            if (MaximumDocuments > 0)
+                                c.MaximumCrawlCount = MaximumDocuments;
 
-                        if (MaximumCrawlTime.TotalMinutes > 0)
-                            c.MaximumCrawlTime = MaximumCrawlTime;
+                            if (MaximumCrawlTime.TotalMinutes > 0)
+                                c.MaximumCrawlTime = MaximumCrawlTime;
 
-                        c.UseCookies = UseCookies;
-                        c.ExcludeFilter = new[]
-                        {
-                            new RegexFilter(new Regex(RegexExcludeFilter))
-                        };
+                            c.UseCookies = UseCookies;
+                            c.ExcludeFilter = new[]
+                            {
+                                new RegexFilter(new Regex(RegexExcludeFilter))
+                            };
 
-                        c.AfterDownload += CrawlerAfterDownload;
-                        c.PipelineException += CrawlerPipelineException;
-                        c.DownloadException += CrawlerDownloadException;
+                            c.AfterDownload += CrawlerAfterDownload;
+                            c.PipelineException += CrawlerPipelineException;
+                            c.DownloadException += CrawlerDownloadException;
                             c.Cancelled += CrawlerCancelled;
 
-                        Event.RaiseEvent("SiteCrawler:Started", new CrawlStartedEventArgs(c));
+                            Event.RaiseEvent("SiteCrawler:Started", new CrawlStartedEventArgs(c));
 
-                        c.Crawl();
+                            c.Crawl();
 
-                        Event.RaiseEvent("SiteCrawler:Finished", new CrawlFinishedEventArgs(c));
+                            Event.RaiseEvent("SiteCrawler:Finished", new CrawlFinishedEventArgs(c));
+                        }
                     }
-                }
-            }
 
                 catch(Exception crawlException)
-            {
-                if (_logger != null) _logger.Error(GetExceptionLog(crawlException).ToString());
+                {
+                    if (_logger != null) _logger.Error(GetExceptionLog(crawlException).ToString());
                     if (_directoryHelper.RestoreDirectoryBackup(dir))
                     {
                         _cancelled = false;
                     }
-            }
-            finally
-            {
-                if (_logger != null) _logger.Info("Crawler finished");
+                }
+                finally
+                {
+                    if (_logger != null) _logger.Info("Crawler finished");
                     _isrunning = false;
                     if (!_cancelled)
                         _directoryHelper.DeleteBackupDirectory(dir);
                 }
             }
-                }
+        }
 
         private void CrawlerCancelled(object sender, EventArgs eventArgs)
         {
@@ -421,7 +421,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             return sb;
         }
 
-        protected IEnumerable<string> GetTransformedUrls()
+        protected IEnumerable<Uri> GetTransformedUrls()
         {
             return _urls.Cast<string>().Select(s =>
                 {
@@ -434,8 +434,12 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     }
                     if (!url.StartsWith("http://") && !url.StartsWith("https://"))
                         url = "http://" + url;
-                    return url;
-                }).Where(s => !string.IsNullOrEmpty(s));
+
+                    if (Uri.IsWellFormedUriString(url, UriKind.Absolute)) return new Uri(url, UriKind.Absolute);
+                    if (Uri.IsWellFormedUriString(url, UriKind.Relative)) return new Uri(url, UriKind.Relative);
+
+                    return null;
+                }).Where(s => s != null );
         }
 
 
@@ -851,7 +855,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 }
                 return _globalVariables;
             }
-            }
+        }
 
         #endregion
     }

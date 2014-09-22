@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using NCrawler;
 using NCrawler.Interfaces;
 using Sitecore.Data;
@@ -11,13 +13,14 @@ namespace Efocus.Sitecore.LuceneWebSearch
         public ShortID RunningContextId { get; set; }
         private readonly IndexUpdateContext _updateContext;
 
-        public UpdateContextAwareCrawler(IndexUpdateContext updateContext, ShortID runningContextId, Uri crawlStart, ILog logger, params IPipelineStep[] pipeline)
-            : base(crawlStart, pipeline)
+        public UpdateContextAwareCrawler(IndexUpdateContext updateContext, ShortID runningContextId, IEnumerable<Uri> urlsToCrawl, ILog logger, params IPipelineStep[] pipeline)
+            : base(urlsToCrawl, pipeline)
         {
             m_Logger = logger;
             RunningContextId = runningContextId;
             _updateContext = updateContext;
         }
+
 
         public IndexUpdateContext UpdateContext
         {
