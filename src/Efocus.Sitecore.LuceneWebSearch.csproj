@@ -45,12 +45,16 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="BoC">
-      <HintPath>$(ModulesLibraryDir)\BoC\BoC.dll</HintPath>
+    <Reference Include="BoC, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b66b1a10e1d96b4d, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>packages\BoC.2.0.0.0\lib\net40\BoC.dll</HintPath>
+    </Reference>
+    <Reference Include="BoC.Logging.Sitecore">
+      <HintPath>packages\BoC.Logging.Sitecore.2.0.1.0\lib\net45\BoC.Logging.Sitecore.dll</HintPath>
     </Reference>
     <Reference Include="HtmlAgilityPack, Version=1.4.6.0, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\packages\HtmlAgilityPack.1.4.6\lib\Net45\HtmlAgilityPack.dll</HintPath>
+      <HintPath>$(ModulesLibraryDir)\sitecore\HtmlAgilityPack.dll</HintPath>
     </Reference>
     <Reference Include="Lucene.Net, Version=3.0.3.0, Culture=neutral, PublicKeyToken=85089178b9ac3181, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -109,6 +113,9 @@
     <Compile Include="UpdateIndexTask.cs" />
     <Compile Include="UpdateContextAwareCrawler.cs" />
     <Compile Include="WebSearchResult.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="License.txt" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
