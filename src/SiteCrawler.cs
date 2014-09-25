@@ -20,6 +20,7 @@ using Lucene.Net.Documents;
 using Lucene.Net.Index;
 using NCrawler;
 using NCrawler.Events;
+using NCrawler.Extensions;
 using NCrawler.HtmlProcessor;
 using NCrawler.Interfaces;
 using NCrawler.Services;
@@ -210,7 +211,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             RebuildIndex(SearchManager.GetIndex(indexName));
         }
 
-        protected virtual void RebuildIndex()
+        public virtual void RebuildIndex()
         {
             RebuildIndex(_index);
         }
@@ -222,7 +223,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             index.Rebuild();
         }
 
-        protected virtual void UpdateIndex()
+        public virtual void UpdateIndex()
         {
             if (_updateIndexRunning)
                 return;
@@ -286,17 +287,17 @@ namespace Efocus.Sitecore.LuceneWebSearch
                 GetIndexWriter(context).DeleteDocuments(new Term(BuiltinFields.Tags, ValueOrEmpty(Tags)));
 
                 var runningContextId = ShortID.NewId();
-                var urls = GetTransformedUrls();
-                foreach (var url in urls)
+                    var urls = GetTransformedUrls().ToList();
+                    if (_logger != null)
                 {
-                    if (_logger != null) _logger.InfoFormat("Starting url: {0}", url);
+                        urls.ForEach( url => _logger.InfoFormat("Starting url: {0}", url));
+                    }
+
                         var documentProcessor = (_logger != null && _logger.IsDebugEnabled)
                             ? new LogHtmlDocumentProcessor(_logger, _indexFilters, _followFilters)
                             : new HtmlDocumentProcessor(_indexFilters, _followFilters);
 
-                        using (
-                            var c = new UpdateContextAwareCrawler(context, runningContextId, new Uri(url),
-                                new LogLoggerBridge(_logger), documentProcessor, this))
+                    using ( var c = new UpdateContextAwareCrawler(context, runningContextId, urls, new LogLoggerBridge(_logger), documentProcessor, this))
                     {
                             if (_logger != null)
                                 _logger.Info(String.Format("Crawler started: Using {0} threads", MaximumThreadCount));
@@ -331,7 +332,6 @@ namespace Efocus.Sitecore.LuceneWebSearch
                         Event.RaiseEvent("SiteCrawler:Finished", new CrawlFinishedEventArgs(c));
                     }
                 }
-            }
 
                 catch(Exception crawlException)
             {
@@ -421,7 +421,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             return sb;
         }
 
-        protected IEnumerable<string> GetTransformedUrls()
+        protected IEnumerable<Uri> GetTransformedUrls()
         {
             return _urls.Cast<string>().Select(s =>
                 {
@@ -434,8 +434,12 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     }
                     if (!url.StartsWith("http://") && !url.StartsWith("https://"))
                         url = "http://" + url;
-                    return url;
-                }).Where(s => !string.IsNullOrEmpty(s));
+
+                    if (Uri.IsWellFormedUriString(url, UriKind.Absolute)) return new Uri(url, UriKind.Absolute);
+                    if (Uri.IsWellFormedUriString(url, UriKind.Relative)) return new Uri(url, UriKind.Relative);
+
+                    return null;
+                }).Where(s => s != null );
         }
 
 
