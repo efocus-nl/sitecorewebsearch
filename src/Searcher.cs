@@ -4,9 +4,10 @@ using System.Linq;
 using Lucene.Net.Index;
 using Lucene.Net.QueryParsers;
 using Lucene.Net.Search;
+using Sitecore.ContentSearch;
+using Sitecore.ContentSearch.LuceneProvider;
 using Sitecore.Data.Items;
 using Sitecore.Globalization;
-using Sitecore.Search;
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
@@ -86,35 +87,49 @@ namespace Efocus.Sitecore.LuceneWebSearch
             Sort sort = null,
             Guid templateId = default(Guid))
         {
-            var searchContext = new FixedSearchContext() { TemplateID = templateId };
+            //Include comments if language fix is needed. Current Searcher.Search can't use an other search context, so i removed it completely!
+            //var searchContext = new FixedSearchContext() { TemplateID = templateId };
 
             var boolQuery = new BooleanQuery();
             if (query != null)
                 boolQuery.Add(query, Occur.MUST);
 
-            if (rootItem != null && rootItem.ID.ToGuid() != global::Sitecore.ItemIDs.RootID.ToGuid())
+            //if (rootItem != null && rootItem.ID.ToGuid() != global::Sitecore.ItemIDs.RootID.ToGuid())
+            //{
+            //    searchContext.Item = rootItem;
+            //}
+
+            //searchContext.ContentLanguages = Languages;
+
+            using (var context = ContentSearchManager.GetIndex(_indexName).CreateSearchContext() as LuceneSearchContext)
             {
-                searchContext.Item = rootItem;
+                if (context != null)
+                {
+                    var searchHits = sort == null ? context.Searcher.Search(boolQuery, int.MaxValue) : context.Searcher.Search(boolQuery, null, int.MaxValue, sort);
+                    totalResults = searchHits.TotalHits;
+
+                    List<ScoreDoc> scoreDocs = searchHits.ScoreDocs.ToList();
+                    if (start != null)
+                    {
+                        if (start > totalResults)
+                            start = totalResults;
+
+                        scoreDocs = scoreDocs.Skip(start.Value).ToList();
+                    }
+                    if (count != null)
+                    {
+                        if (count > totalResults - start)
+                            count = totalResults - start;
+
+                        scoreDocs = scoreDocs.Take(count.Value).ToList();
+                    }
+
+                    return scoreDocs.Select(hit => new WebSearchResult(context.Searcher, hit)).ToList();
+                }
             }
 
-            searchContext.ContentLanguages = Languages;
-
-            using (var context = new SortableIndexSearchContext(SearchManager.GetIndex(_indexName)))
-            {
-                var searchHits = sort == null ? context.Search(boolQuery, int.MaxValue, searchContext) : context.Search(boolQuery, searchContext, sort);
-                totalResults = searchHits.Length;
-                //var resultCollection = searchHits.FetchResults(start, count);
-                IEnumerable<SearchHit> hits;
-                if (start != null)
-                {
-                    hits = (count.HasValue) ? searchHits.Slice(start.Value, count.Value) : searchHits.Slice(start.Value);
-                }
-                else
-                {
-                    hits = searchHits.Hits;
-                }
-                return hits.Select(hit => new WebSearchResult(hit)).ToList();
-            }
+            totalResults = 0;
+            return Enumerable.Empty<WebSearchResult>();
         }
 
     }

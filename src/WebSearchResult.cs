@@ -1,27 +1,32 @@
 ﻿using System;
+using Lucene.Net.Documents;
+using Lucene.Net.Search;
 using Sitecore;
 using Sitecore.Configuration;
+using Sitecore.ContentSearch;
+using Sitecore.ContentSearch.SearchTypes;
 using Sitecore.Data;
 using Sitecore.Data.Items;
-using Sitecore.Search;
 using Sitecore.SecurityModel;
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
     public class WebSearchResult
     {
-        public WebSearchResult(SearchHit hit)
+        public WebSearchResult(IndexSearcher searcher, ScoreDoc scoreDoc)
         {
-            var result = new SearchResult(hit);
-            
-            PathAndQuery = hit.Document.Get(BuiltinFields.Path);
-            Title = result.Title;
-            Description = hit.Document.Get(CustomFields.Description);
-            Score = hit.Position;
+            Document doc = searcher.Doc(scoreDoc.Doc);
 
-            if (!string.IsNullOrEmpty(result.Url) && ItemUri.IsItemUri(result.Url))
+            var result = new SearchResultItem();
+            Url = doc.Get(BuiltinFields.Url);
+            PathAndQuery = doc.Get(BuiltinFields.Path);
+            Title = doc.Get(BuiltinFields.Name);
+            Description = doc.Get(CustomFields.Description);
+            Score = scoreDoc.Score;
+
+            if (!string.IsNullOrEmpty(Url) && ItemUri.IsItemUri(Url))
             {
-                var uri = ItemUri.Parse(result.Url);
+                var uri = ItemUri.Parse(Url);
                 var db = !String.IsNullOrEmpty(uri.DatabaseName)
                              ? Factory.GetDatabase(uri.DatabaseName)
                              : global::Sitecore.Context.Database;
@@ -35,6 +40,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             }
         }
 
+        public string Url { get; set; }
         public string Description { get; set; }
         public string Title { get; set; }
 
@@ -65,6 +71,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
         }
 
         private Item _userItem;
+
         public Item UserItem
         {
             get

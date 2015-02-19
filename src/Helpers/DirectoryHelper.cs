@@ -2,8 +2,8 @@
 using System.IO;
 using System.Linq;
 using BoC.Logging;
+using Sitecore.ContentSearch.LuceneProvider;
 using Sitecore.Extensions;
-using Sitecore.Search;
 
 namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 {
@@ -22,7 +22,7 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 
             try
             {
-            Directory.Delete(dir, true);
+                Directory.Delete(dir, true);
             }
             catch (Exception e)
             {
@@ -58,7 +58,7 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
                     try
                     {
                         DeleteDirectory(dir);
-                }
+                    }
                     catch (Exception e)
                     {
                         //TODO: What should we do now that the backup dir is corrupted?
@@ -85,7 +85,7 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
 
                 try
                 {
-                Directory.Delete(dir, true);
+                    Directory.Delete(dir, true);
                 }
                 catch (Exception e)
                 {
@@ -99,18 +99,18 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
                                     fi => !".lock".Equals(fi.Extension, StringComparison.InvariantCultureIgnoreCase)))
                         {
                             file.Delete();
-                }
+                        }
                     }
                     catch (Exception e1)
-                {
+                    {
                         _logger.InfoFormat("Backup Manager: File by file also failed :( . Could not delete directory: {0}. Exception: {1}. Trying file by file now", dir, e1);
-                    return false;
+                        return false;
+                    }
                 }
-            }
             }
             if (!Directory.Exists(dir))
             {
-            Directory.CreateDirectory(dir);
+                Directory.CreateDirectory(dir);
             }
             CopyDirectory(backup, dir, true);
             _logger.InfoFormat("Backup Manager: Backup restored for: {0}", dir);
@@ -153,9 +153,9 @@ namespace Efocus.Sitecore.LuceneWebSearch.Helpers
             }
         }
 
-        public string GetDirectoryName(Index index)
+        public string GetDirectoryName(LuceneIndex index)
         {
-            return index.Directory.GetPath().Split(new[] {index.Name}, StringSplitOptions.None)[0] + index.Name;
+            return index.Directory.GetPath().Split(new[] { index.Name }, StringSplitOptions.None)[0] + index.Name;
         }
     }
 }

@@ -1,19 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using NCrawler;
 using NCrawler.Interfaces;
+using Sitecore.ContentSearch.LuceneProvider;
 using Sitecore.Data;
-using Sitecore.Search;
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
-    public class UpdateContextAwareCrawler: Crawler
+    public class UpdateContextAwareCrawler : Crawler
     {
         public ShortID RunningContextId { get; set; }
-        private readonly IndexUpdateContext _updateContext;
+        private readonly LuceneUpdateContext _updateContext;
 
-        public UpdateContextAwareCrawler(IndexUpdateContext updateContext, ShortID runningContextId, IEnumerable<Uri> urlsToCrawl, ILog logger, params IPipelineStep[] pipeline)
+        public UpdateContextAwareCrawler(LuceneUpdateContext updateContext, ShortID runningContextId, IEnumerable<Uri> urlsToCrawl, ILog logger, params IPipelineStep[] pipeline)
             : base(urlsToCrawl, pipeline)
         {
             m_Logger = logger;
@@ -21,8 +20,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
             _updateContext = updateContext;
         }
 
-
-        public IndexUpdateContext UpdateContext
+        public LuceneUpdateContext UpdateContext
         {
             get { return _updateContext; }
         }

@@ -1,10 +1,11 @@
 ﻿using System;
-using Efocus.Sitecore.LuceneWebSearch.Enums;
+using BoC.InversionOfControl;
+using Efocus.Sitecore.LuceneWebSearch.Events;
 using Sitecore.Data.Items;
 using Sitecore.Diagnostics;
-using Sitecore.Events;
-using Sitecore.Search;
+using Sitecore.Eventing;
 using Sitecore.Tasks;
+
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
@@ -22,17 +23,15 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     {
                         try
                         {
-                            var index = SearchManager.GetIndex(indexName) ?? new Index(indexName, String.Format("__{0}", indexName)); ;
-                            if ("update".Equals(item["Action"], StringComparison.InvariantCultureIgnoreCase))
-                            {
-                                Event.RaiseEvent(String.Format("efocus:updateindex:{0}", index.Name.ToLower()));
-                                Event.RaiseEvent(String.Format("efocus:updateindex:{0}:remote", index.Name.ToLower()));
-                            }
-                            else
-                            {
-                                Event.RaiseEvent(String.Format("efocus:rebuildindex:{0}", index.Name.ToLower()));
-                                Event.RaiseEvent(String.Format("efocus:rebuildindex:{0}:remote", index.Name.ToLower()));
-                            }
+                            var crawledIndexEvent = IoC.Resolver != null ? IoC.Resolver.Resolve<CrawlIndexEvent>() : new CrawlIndexEvent();
+                            crawledIndexEvent.IndexName = indexName;
+
+                            //look what kind of action needs to be taken
+                            crawledIndexEvent.Method = "update".Equals(item["Action"], StringComparison.InvariantCultureIgnoreCase) ? CrawlMethod.Update : CrawlMethod.Rebuild;
+
+                            //Queue the event to other servers
+                            //TODO: Add option to put settings in schedule/command item
+                            EventManager.QueueEvent(crawledIndexEvent, Properties.Settings.Default.RaiseCrawlEventOnRemoteQueue, Properties.Settings.Default.RaiseCrawlEventOnLocalQueue);
                         }
                         catch (Exception exception)
                         {

@@ -16,20 +16,20 @@ namespace Efocus.Sitecore.LuceneWebSearch
     {
         protected override void Load(ContainerBuilder builder)
         {
-            RegistrationExtensions.Register(builder, c => new CustomWebDownloader()).As<IWebDownloader>().ExternallyOwned();
-            RegistrationExtensions.Register(builder, c => new HashtagIndependentInMemoryCrawlerHistoryService()).As<ICrawlerHistory>().InstancePerDependency();
-            RegistrationExtensions.Register(builder, c => new InMemoryCrawlerQueueService()).As<ICrawlerQueue>().InstancePerDependency();
-            RegistrationExtensions.Register(builder, c => new LogLoggerBridge(CreateLogger())).As<ILog>().InstancePerDependency();
-            RegistrationExtensions.Register(builder, c => new NativeTaskRunnerService()).As<ITaskRunner>().InstancePerDependency();
-            RegistrationExtensions.Register(builder, (c, p) => new RobotService(ParameterExtensions.TypedAs<IEnumerable<Uri>>(p), ResolutionExtensions.Resolve<IWebDownloader>(c))).As<IRobot>().InstancePerDependency();
-            RegistrationExtensions.Register(builder, (c, p) => new CrawlerRulesService(ParameterExtensions.TypedAs<Crawler>(p), ResolutionExtensions.Resolve<IRobot>(c, p), ParameterExtensions.TypedAs<IEnumerable<Uri>>(p))).As<ICrawlerRules>().InstancePerDependency();
+            builder.Register(c => new CustomWebDownloader()).As<IWebDownloader>().ExternallyOwned();
+            builder.Register(c => new HashtagIndependentInMemoryCrawlerHistoryService()).As<ICrawlerHistory>().InstancePerDependency();
+            builder.Register(c => new InMemoryCrawlerQueueService()).As<ICrawlerQueue>().InstancePerDependency();
+            builder.Register(c => new LogLoggerBridge(CreateLogger())).As<ILog>().InstancePerDependency();
+            builder.Register(c => new NativeTaskRunnerService()).As<ITaskRunner>().InstancePerDependency();
+            builder.Register((c, p) => new RobotService(ParameterExtensions.TypedAs<IEnumerable<Uri>>(p), ResolutionExtensions.Resolve<IWebDownloader>(c))).As<IRobot>().InstancePerDependency();
+            builder.Register((c, p) => new CrawlerRulesService(ParameterExtensions.TypedAs<Crawler>(p), ResolutionExtensions.Resolve<IRobot>(c, p), ParameterExtensions.TypedAs<IEnumerable<Uri>>(p))).As<ICrawlerRules>().InstancePerDependency();
         }
 
         protected virtual ILogger CreateLogger()
         {
             ILogger logger = IoC.Resolver != null ? IoC.Resolver.Resolve<ILogger>() : null;
             if (logger == null)
-        {
+            {
                 logger = new SiteCoreLogger();
             }
 
@@ -38,7 +38,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
         public static void SetupCustomCrawlerModule()
         {
-          NCrawlerModule.Setup(new Module[1]
+            NCrawlerModule.Setup(new Module[1]
         {
             new CustomNCrawlerModule()
           });
