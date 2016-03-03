@@ -1,11 +1,8 @@
 ﻿using System;
-using BoC.InversionOfControl;
-using Efocus.Sitecore.LuceneWebSearch.Events;
 using Sitecore.Data.Items;
 using Sitecore.Diagnostics;
-using Sitecore.Eventing;
+using Sitecore.Events;
 using Sitecore.Tasks;
-
 
 namespace Efocus.Sitecore.LuceneWebSearch
 {
@@ -23,15 +20,19 @@ namespace Efocus.Sitecore.LuceneWebSearch
                     {
                         try
                         {
-                            var crawledIndexEvent = IoC.Resolver != null ? IoC.Resolver.Resolve<CrawlIndexEvent>() : new CrawlIndexEvent();
-                            crawledIndexEvent.IndexName = indexName;
-
-                            //look what kind of action needs to be taken
-                            crawledIndexEvent.Method = "update".Equals(item["Action"], StringComparison.InvariantCultureIgnoreCase) ? CrawlMethod.Update : CrawlMethod.Rebuild;
-
-                            //Queue the event to other servers
-                            //TODO: Add option to put settings in schedule/command item
-                            EventManager.QueueEvent(crawledIndexEvent, Properties.Settings.Default.RaiseCrawlEventOnRemoteQueue, Properties.Settings.Default.RaiseCrawlEventOnLocalQueue);
+                            if ("update".Equals(item["Action"], StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                //SwitchOnRebuildIndex doesn't know an update function, so always do rebuild index
+                                //Event.RaiseEvent(String.Format("efocus:updateindex:{0}", indexName.ToLower()));
+                                //Event.RaiseEvent(String.Format("efocus:updateindex:{0}:remote", indexName.ToLower()));
+                                Event.RaiseEvent(String.Format("efocus:rebuildindex:{0}", indexName.ToLower()));
+                                Event.RaiseEvent(String.Format("efocus:rebuildindex:{0}:remote", indexName.ToLower()));
+                            }
+                            else
+                            {
+                                Event.RaiseEvent(String.Format("efocus:rebuildindex:{0}", indexName.ToLower()));
+                                Event.RaiseEvent(String.Format("efocus:rebuildindex:{0}:remote", indexName.ToLower()));
+                            }
                         }
                         catch (Exception exception)
                         {
