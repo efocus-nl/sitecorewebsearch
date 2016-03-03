@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net;
@@ -13,7 +12,6 @@ using System.Threading;
 using System.Xml;
 using BoC.InversionOfControl;
 using BoC.Logging;
-using Efocus.Sitecore.LuceneWebSearch.Helpers;
 using Efocus.Sitecore.LuceneWebSearch.SitecoreProcessors;
 using Efocus.Sitecore.LuceneWebSearch.Support;
 using HtmlAgilityPack;
@@ -39,7 +37,6 @@ using Sitecore.Events;
 using Sitecore.Extensions;
 using Sitecore.Jobs;
 using Sitecore.Links;
-using Sitecore.Search;
 using Sitecore.SecurityModel;
 using BuiltinFields = Sitecore.ContentSearch.BuiltinFields;
 using CrawlFinishedEventArgs = Efocus.Sitecore.LuceneWebSearch.Support.CrawlFinishedEventArgs;
@@ -543,11 +540,7 @@ namespace Efocus.Sitecore.LuceneWebSearch
 
         private void HandleRebuildIndexEvent(object sender, EventArgs eventArgs)
         {
-            if (_updateContext == null)
-                _updateContext = new LuceneFullRebuildContext(_index, new CommitPolicyExecutor());
-
-            //JobManager.Start(new JobOptions(string.Format("efcrawler:rebuild:{0}", _updateContext.Index.Name), "Indexing", _updateContext.Index.Name, this, "UpdateIndex", new object[] { _updateContext as LuceneFullRebuildContext, true}));
-            RebuildFromRoot(_updateContext as LuceneFullRebuildContext);
+            _index.Rebuild();
         }
 
         private void HandleUpdateIndexEvent(object sender, EventArgs eventArgs)
